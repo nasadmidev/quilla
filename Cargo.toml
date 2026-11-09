@@ -12,3 +12,4 @@ name = "quilla"
 path = "src/main.rs"
 
 [dependencies]
+sha2 = "0.11.1"

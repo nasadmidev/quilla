@@ -1,0 +1,117 @@
+use crate::package::{Arch, PackageMeta};
+use crate::{Error, Result};
+use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::{Path, PathBuf};
+
+pub struct Store {
+    store_dir: PathBuf,
+}
+
+impl Store {
+    pub fn new<P: AsRef<Path>>(store_dir: P) -> Result<Self> {
+        let store_dir = store_dir.as_ref().to_path_buf();
+        match fs::create_dir_all(&store_dir) {
+            Ok(_) => Ok(Self { store_dir }),
+            Err(e) => Err(StoreError::CreateStorageError(store_dir, e).into()),
+        }
+    }
+
+    pub fn get_package_path(&self, meta: &PackageMeta) -> PathBuf {
+        let metadata = format!(
+            "{}-{}-{}",
+            meta.name,
+            meta.version,
+            match meta.arch {
+                Arch::Aarch64 => "aarch64",
+                Arch::X86_64 => "x86_64",
+                Arch::Any => "any",
+            }
+        );
+        let hash = Sha256::digest(metadata.as_bytes());
+        self.store_dir.join(format!("{:x?}", hash))
+    }
+
+    pub fn store_package(&self, meta: &PackageMeta, temp_extracted_dir: &Path) -> Result<PathBuf> {
+        let target_path = self.get_package_path(meta);
+        if target_path.exists() {
+            return Ok(target_path);
+        }
+
+        fs::rename(temp_extracted_dir, &target_path).map_err(|e| StoreError::RenameError {
+            from: temp_extracted_dir.to_path_buf(),
+            to: target_path.clone(),
+            source: e,
+        })?;
+        self.make_immutable(&target_path)?;
+        Ok(target_path)
+    }
+
+    fn make_immutable(&self, path: &Path) -> Result<()> {
+        for entry in walkdir(path)? {
+            let mut perms = fs::metadata(&entry)?.permissions();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = if entry.is_dir() { 0o555 } else { 0o444 };
+                perms.set_mode(mode);
+            }
+            fs::set_permissions(&entry, perms).map_err(|e| StoreError::SetPermissionsError(entry, e))?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum StoreError {
+    CreateStorageError(PathBuf, std::io::Error),
+    DirectoryWalkError(std::io::Error),
+    SetPermissionsError(PathBuf, std::io::Error),
+    RenameError {
+        from: PathBuf,
+        to: PathBuf,
+        source: std::io::Error,
+    },
+    HashCalculationError(String),
+}
+
+impl std::fmt::Display for StoreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::CreateStorageError(path, e) => {
+                write!(f, "Error creating storage path in {path:?}: {e}")
+            }
+            Self::DirectoryWalkError(e) => write!(f, "Error while iterating through storage: {e}"),
+            Self::SetPermissionsError(path, e) => {
+                write!(f, "Cannot be applied immutable permission in {path:?}: {e}")
+            }
+            Self::RenameError { from, to, source } => write!(
+                f,
+                "Error on moving the temp package from {from:?} to {to:?}: {source}"
+            ),
+            Self::HashCalculationError(msg) => write!(f, "Error on calculation hash: {msg}"),
+        }
+    }
+}
+
+impl From<StoreError> for Error {
+    fn from(e: StoreError) -> Self {
+        Error::Store(e)
+    }
+}
+
+fn walkdir(dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir).map_err(|e| StoreError::DirectoryWalkError(e))? {
+            let entry = entry.map_err(|e| StoreError::DirectoryWalkError(e))?;
+            let path = entry.path();
+            if path.is_dir() {
+                files.extend(walkdir(&path)?);
+            }
+            files.push(path);
+        }
+    }
+    Ok(files)
+}

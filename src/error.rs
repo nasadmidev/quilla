@@ -1,3 +1,4 @@
+use crate::store::{StoreError};
 use crate::package::{PackageError};
 use std::fmt::{Display};
 use std::io;
@@ -6,7 +7,8 @@ use std::io;
 pub enum Error {
     InvalidArgs(String),
     Io(io::Error),
-    Package(PackageError)
+    Package(PackageError),
+    Store(StoreError)
 }
 
 impl Display for Error {
@@ -15,6 +17,7 @@ impl Display for Error {
             Error::InvalidArgs(msg) => write!(f, "Invalid argument: {msg}"),
             Error::Io(e) => write!(f, "I/O Error: {e}"),
             Error::Package(e) => write!(f, "Package Error: {e}"),
+            Error::Store(e) => write!(f, "Store Error: {e}")
         }
     }
 }
