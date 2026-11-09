@@ -1,0 +1,14 @@
+[package]
+name = "quilla"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "quilla"
+path = "src/lib.rs"
+
+[[bin]]
+name = "quilla"
+path = "src/main.rs"
+
+[dependencies]
