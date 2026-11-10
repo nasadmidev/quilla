@@ -1,7 +1,8 @@
-use crate::store::{StoreError};
+use crate::repo::RepositoryError;
+use crate::store::StoreError;
 use crate::generations::GenerationError;
-use crate::package::{PackageError};
-use std::fmt::{Display};
+use crate::package::PackageError;
+use std::fmt::Display;
 use std::io;
 
 #[derive(Debug)]
@@ -12,6 +13,7 @@ pub enum Error {
     Store(StoreError),
     Generation(GenerationError),
     Database(String),
+    Repository(RepositoryError)
 }
 
 impl Display for Error {
@@ -22,7 +24,8 @@ impl Display for Error {
             Error::Package(e) => write!(f, "Package Error: {e}"),
             Error::Store(e) => write!(f, "Store Error: {e}"),
             Error::Generation(e) => write!(f, "Generation Error: {e}"),
-            Error::Database(e) => write!(f, "Database Error: {e}")
+            Error::Database(e) => write!(f, "Database Error: {e}"),
+            Error::Repository(e) => write!(f, "Repository Error: {e}"),
         }
     }
 }

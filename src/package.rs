@@ -185,7 +185,9 @@ impl Constraint {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Arch {
+    #[serde(rename = "x86_64")]
     X86_64,
     Aarch64,
     Any,
