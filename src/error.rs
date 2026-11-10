@@ -11,6 +11,7 @@ pub enum Error {
     Package(PackageError),
     Store(StoreError),
     Generation(GenerationError),
+    Database(String),
 }
 
 impl Display for Error {
@@ -20,7 +21,8 @@ impl Display for Error {
             Error::Io(e) => write!(f, "I/O Error: {e}"),
             Error::Package(e) => write!(f, "Package Error: {e}"),
             Error::Store(e) => write!(f, "Store Error: {e}"),
-            Error::Generation(e) => write!(f, "Generation Error: {e}")
+            Error::Generation(e) => write!(f, "Generation Error: {e}"),
+            Error::Database(e) => write!(f, "Database Error: {e}")
         }
     }
 }

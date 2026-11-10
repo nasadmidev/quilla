@@ -5,6 +5,7 @@ pub mod cli;
 pub mod generations;
 pub mod package;
 pub mod store;
+pub mod db;
 use store::StoreError;
 pub use error::{Error, Result};
 

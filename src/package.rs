@@ -3,8 +3,9 @@ use std::cmp::Ordering;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::fs::File;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Package version info
 pub struct Version {
     pub epoch: u32,
@@ -113,7 +114,7 @@ impl std::fmt::Display for Version {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Dependency {
     pub name: String,
     pub constraint: Constraint,
@@ -158,7 +159,7 @@ impl FromStr for Dependency {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 /// Dependencies range
 pub enum Constraint {
     Any,
@@ -183,14 +184,14 @@ impl Constraint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Arch {
     X86_64,
     Aarch64,
     Any,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageMeta {
     pub name: String,
     pub version: Version,
