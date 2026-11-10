@@ -29,7 +29,8 @@ impl Store {
             }
         );
         let hash = Sha256::digest(metadata.as_bytes());
-        self.store_dir.join(format!("{:x?}", hash))
+        let hex: String = hash.into_iter().map(|b| format!("{b:02x}")).collect();
+        self.store_dir.join(format!("{hex}-{metadata}"))
     }
 
     pub fn store_package(&self, meta: &PackageMeta, temp_extracted_dir: &Path) -> Result<PathBuf> {
@@ -48,7 +49,7 @@ impl Store {
     }
 
     fn make_immutable(&self, path: &Path) -> Result<()> {
-        for entry in walkdir(path)? {
+        for entry in crate::walkdir(path)? {
             let mut perms = fs::metadata(&entry)?.permissions();
             #[cfg(unix)]
             {
@@ -56,7 +57,15 @@ impl Store {
                 let mode = if entry.is_dir() { 0o555 } else { 0o444 };
                 perms.set_mode(mode);
             }
-            fs::set_permissions(&entry, perms).map_err(|e| StoreError::SetPermissionsError(entry, e))?;
+            #[cfg(not(unix))]
+            {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "immutabily store currently require a Unix-like operating system",
+                ));
+            }
+            fs::set_permissions(&entry, perms)
+                .map_err(|e| StoreError::SetPermissionsError(entry, e))?;
         }
 
         Ok(())
@@ -99,19 +108,4 @@ impl From<StoreError> for Error {
     fn from(e: StoreError) -> Self {
         Error::Store(e)
     }
-}
-
-fn walkdir(dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut files = Vec::new();
-    if dir.is_dir() {
-        for entry in fs::read_dir(dir).map_err(|e| StoreError::DirectoryWalkError(e))? {
-            let entry = entry.map_err(|e| StoreError::DirectoryWalkError(e))?;
-            let path = entry.path();
-            if path.is_dir() {
-                files.extend(walkdir(&path)?);
-            }
-            files.push(path);
-        }
-    }
-    Ok(files)
 }
