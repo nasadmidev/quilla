@@ -1,4 +1,5 @@
 use crate::repo::RepositoryError;
+use crate::resolver::ResolverError;
 use crate::store::StoreError;
 use crate::generations::GenerationError;
 use crate::package::PackageError;
@@ -13,7 +14,8 @@ pub enum Error {
     Store(StoreError),
     Generation(GenerationError),
     Database(String),
-    Repository(RepositoryError)
+    Repository(RepositoryError),
+    Resolver(ResolverError),
 }
 
 impl Display for Error {
@@ -26,6 +28,7 @@ impl Display for Error {
             Error::Generation(e) => write!(f, "Generation Error: {e}"),
             Error::Database(e) => write!(f, "Database Error: {e}"),
             Error::Repository(e) => write!(f, "Repository Error: {e}"),
+            Error::Resolver(e) => write!(f, "Resolver Error: {e}")
         }
     }
 }

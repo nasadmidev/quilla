@@ -7,6 +7,7 @@ pub mod package;
 pub mod store;
 pub mod db;
 pub mod repo;
+pub mod resolver;
 use store::StoreError;
 pub use error::{Error, Result};
 
