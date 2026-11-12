@@ -8,6 +8,8 @@ pub mod store;
 pub mod db;
 pub mod repo;
 pub mod resolver;
+pub mod fetch;
+pub mod verify;
 use store::StoreError;
 pub use error::{Error, Result};
 

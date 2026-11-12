@@ -6,7 +6,6 @@ use std::fs::File;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-/// Package version info
 pub struct Version {
     pub epoch: u32,
     pub upstream: String,

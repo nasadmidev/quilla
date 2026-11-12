@@ -1,8 +1,10 @@
+use crate::fetch::FetchError;
 use crate::repo::RepositoryError;
 use crate::resolver::ResolverError;
 use crate::store::StoreError;
 use crate::generations::GenerationError;
 use crate::package::PackageError;
+use crate::verify::VerifyError;
 use std::fmt::Display;
 use std::io;
 
@@ -16,6 +18,8 @@ pub enum Error {
     Database(String),
     Repository(RepositoryError),
     Resolver(ResolverError),
+    Fetch(FetchError),
+    Verify(VerifyError),
 }
 
 impl Display for Error {
@@ -28,7 +32,9 @@ impl Display for Error {
             Error::Generation(e) => write!(f, "Generation Error: {e}"),
             Error::Database(e) => write!(f, "Database Error: {e}"),
             Error::Repository(e) => write!(f, "Repository Error: {e}"),
-            Error::Resolver(e) => write!(f, "Resolver Error: {e}")
+            Error::Resolver(e) => write!(f, "Resolver Error: {e}"),
+            Error::Fetch(e) => write!(f, "Fetching error: {e}"),
+            Error::Verify(e) => write!(f,  "Verify error: {e}")
         }
     }
 }
