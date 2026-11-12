@@ -139,7 +139,15 @@ impl FromStr for Dependency {
                 } else if let Some(v) = op_and_version.strip_prefix('<') {
                     Constraint::Lt(v.parse()?)
                 } else if let Some(v) = op_and_version.strip_prefix('=') {
-                    Constraint::Eq(v.parse()?)
+                    // Pacman also uses `name=soname` for exact shared-library
+                    // ABI dependencies, for example
+                    // `libwlroots-0.20.so=libwlroots-0.20.so-64`.
+                    // These are identities, not package versions.
+                    if name.contains(".so") && is_valid_name(v) {
+                        Constraint::Soname(v.to_string())
+                    } else {
+                        Constraint::Eq(v.parse()?)
+                    }
                 } else {
                     unreachable!()
                 };
@@ -164,6 +172,7 @@ impl FromStr for Dependency {
 pub enum Constraint {
     Any,
     Eq(Version),
+    Soname(String),
     Ge(Version),
     Gt(Version),
     Le(Version),
@@ -176,6 +185,7 @@ impl Constraint {
         match self {
             Constraint::Any => true,
             Constraint::Eq(req) => version.cmp_for_constraint(req) == Equal,
+            Constraint::Soname(_) => false,
             Constraint::Ge(req) => version.cmp_for_constraint(req) != Less,
             Constraint::Gt(req) => version.cmp_for_constraint(req) == Greater,
             Constraint::Le(req) => version.cmp_for_constraint(req) != Greater,
@@ -220,7 +230,10 @@ pub struct PackageMeta {
 
 impl PackageMeta {
     pub fn satisfies(&self, dep: &Dependency) -> bool {
-        if self.name == dep.name && dep.constraint.matches(&self.version) {
+        if self.name == dep.name
+            && !matches!(dep.constraint, Constraint::Soname(_))
+            && dep.constraint.matches(&self.version)
+        {
             return true;
         }
 
@@ -229,6 +242,9 @@ impl PackageMeta {
                 && match &p.constraint {
                     Constraint::Eq(v) => dep.constraint.matches(v),
                     Constraint::Any => dep.constraint == Constraint::Any,
+                    Constraint::Soname(provided) => {
+                        matches!(&dep.constraint, Constraint::Soname(required) if required == provided)
+                    }
                     _ => false,
                 }
         })

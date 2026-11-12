@@ -1,4 +1,4 @@
-use quilla::Result;
+use quilla::{Result, Error};
 use quilla::cli::{self, Command};
 use quilla::config::Config;
 use quilla::db::Database;
@@ -23,7 +23,15 @@ fn main() -> ExitCode {
 fn run() -> quilla::Result<()> {
     let config_path = match env::var("QUILLA_CONFIG") {
         Ok(s) => PathBuf::from(s),
-        Err(_) => PathBuf::from("/home/nasadmidev/.config/quilla.config.toml"),
+        Err(_) => {
+            let home = match env::var("HOME") {
+                Ok(s) => s,
+                Err(_) => {
+                    return Err(Error::Configuration("Could not retrieve the user's home directory".to_string()))
+                }
+            };
+            PathBuf::from(format!("{home}/.config/quilla.config.toml"))
+        },
     };
     let config = Config::load(config_path)?;
 

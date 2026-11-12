@@ -60,7 +60,14 @@ impl Store {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                let mode = if metadata.is_dir() { 0o555 } else { 0o444 };
+                let mode = if metadata.is_dir() {
+                    0o555
+                } else if perms.mode() & 0o111 != 0 {
+                    // Keep executables runnable while removing write access.
+                    0o555
+                } else {
+                    0o444
+                };
                 perms.set_mode(mode);
             }
             #[cfg(not(unix))]
