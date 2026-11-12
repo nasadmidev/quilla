@@ -49,6 +49,12 @@ impl Fetcher {
         };
         Ok((temp_path, final_path))
     }
+
+    pub fn download_bytes(&self, url: &str) -> Result<Vec<u8>> {
+        let response = self.client.get(url).send().and_then(Response::error_for_status).map_err(|e| FetchError::RequestFailed(e.to_string()))?;
+        let bytes = response.bytes().map_err(|e| FetchError::RequestFailed(e.to_string()))?;
+        Ok(bytes.to_vec())
+    }
 }
 
 #[derive(Debug)]

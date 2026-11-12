@@ -2,7 +2,12 @@ use crate::package::{Dependency, PackageMeta};
 use crate::{Error, Result};
 use hex;
 use serde::{Deserialize, Serialize};
+use flate2::read::GzDecoder;
+use std::collections::HashMap;
+use std::io::{Cursor, Read};
 use std::path::{Component, Path};
+use std::str::FromStr;
+use tar::Archive;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepositoryRecord {
@@ -51,12 +56,138 @@ impl Repository {
     }
 
     pub fn parse_index(&mut self, bytes: &[u8]) -> Result<()> {
-        let records: Vec<RepositoryRecord> = serde_json::from_slice(bytes)
-            .map_err(|e| RepositoryError::ParsingError(e.to_string()))?;
+        let decoder = GzDecoder::new(Cursor::new(bytes));
+        let mut archive = Archive::new(decoder);
+        let entries = archive
+            .entries()
+            .map_err(|e| RepositoryError::ParsingError(format!("cannot read database archive: {e}")))?;
+
+        let mut records = Vec::new();
+        for entry in entries {
+            let mut entry = entry
+                .map_err(|e| RepositoryError::ParsingError(format!("cannot read database entry: {e}")))?;
+            let entry_path = entry
+                .path()
+                .map_err(|e| RepositoryError::ParsingError(format!("invalid database entry path: {e}")))?;
+
+            if !entry.header().entry_type().is_file()
+                || entry_path.file_name() != Some(std::ffi::OsStr::new("desc"))
+            {
+                continue;
+            }
+
+            let mut desc = String::new();
+            entry
+                .read_to_string(&mut desc)
+                .map_err(|e| RepositoryError::ParsingError(format!("cannot read package description: {e}")))?;
+            records.push(parse_repository_record(&desc)?);
+        }
+
+        if records.is_empty() {
+            return Err(RepositoryError::ParsingError(
+                "database archive contains no package descriptions".to_string(),
+            )
+            .into());
+        }
+
         validate(&records)?;
         self.records = records;
         Ok(())
     }
+}
+
+fn parse_repository_record(desc: &str) -> Result<RepositoryRecord> {
+    let mut fields: HashMap<String, Vec<String>> = HashMap::new();
+    let mut current_field: Option<String> = None;
+
+    for line in desc.lines() {
+        if line.is_empty() {
+            continue;
+        }
+
+        if line.starts_with('%') && line.ends_with('%') && line.len() > 2 {
+            let field = line[1..line.len() - 1].to_string();
+            fields.entry(field.clone()).or_default();
+            current_field = Some(field);
+        } else if let Some(field) = &current_field {
+            fields.entry(field.clone()).or_default().push(line.to_string());
+        } else {
+            return Err(RepositoryError::ParsingError(format!(
+                "value appears before a field header: {line}"
+            ))
+            .into());
+        }
+    }
+
+    let name = required_field(&fields, "NAME")?.to_string();
+    let version = required_field(&fields, "VERSION")?.parse()?;
+    let arch = match required_field(&fields, "ARCH")? {
+        "x86_64" => crate::package::Arch::X86_64,
+        "aarch64" => crate::package::Arch::Aarch64,
+        "any" => crate::package::Arch::Any,
+        other => {
+            return Err(RepositoryError::ValidationError(format!(
+                "unsupported package architecture `{other}` for `{name}`"
+            ))
+            .into());
+        }
+    };
+    let description = optional_field(&fields, "DESC").unwrap_or_default().to_string();
+    let url = optional_field(&fields, "URL")
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    let licenses = field_values(&fields, "LICENSE").to_vec();
+    let installed_size = required_field(&fields, "ISIZE")?.parse::<u64>().map_err(|e| {
+        RepositoryError::ParsingError(format!("invalid ISIZE for `{name}`: {e}"))
+    })?;
+
+    let package = PackageMeta {
+        name,
+        version,
+        arch,
+        description,
+        url,
+        licenses,
+        installed_size,
+        depends: parse_dependencies(&fields, "DEPENDS")?,
+        conflicts: parse_dependencies(&fields, "CONFLICTS")?,
+        provides: parse_dependencies(&fields, "PROVIDES")?,
+        replaces: parse_dependencies(&fields, "REPLACES")?,
+    };
+
+    Ok(RepositoryRecord {
+        package,
+        archive_path: required_field(&fields, "FILENAME")?.to_string(),
+        sha256: required_field(&fields, "SHA256SUM")?.to_string(),
+    })
+}
+
+fn required_field<'a>(fields: &'a HashMap<String, Vec<String>>, key: &str) -> Result<&'a str> {
+    optional_field(fields, key).ok_or_else(|| {
+        RepositoryError::ParsingError(format!("missing required %{key}% field")).into()
+    })
+}
+
+fn optional_field<'a>(fields: &'a HashMap<String, Vec<String>>, key: &str) -> Option<&'a str> {
+    fields
+        .get(key)
+        .and_then(|values| values.first())
+        .map(String::as_str)
+}
+
+fn field_values<'a>(fields: &'a HashMap<String, Vec<String>>, key: &str) -> &'a [String] {
+    fields.get(key).map(Vec::as_slice).unwrap_or(&[])
+}
+
+fn parse_dependencies(fields: &HashMap<String, Vec<String>>, key: &str) -> Result<Vec<Dependency>> {
+    field_values(fields, key)
+        .iter()
+        .map(|value| {
+            Dependency::from_str(value).map_err(|e| {
+                RepositoryError::ParsingError(format!("invalid %{key}% value `{value}`: {e}")).into()
+            })
+        })
+        .collect()
 }
 
 fn validate(records: &[RepositoryRecord]) -> Result<()> {
@@ -147,7 +278,7 @@ pub enum RepositoryError {
 impl std::fmt::Display for RepositoryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RepositoryError::ParsingError(e) => write!(f, "Error on parsing JSON: {e}"),
+            RepositoryError::ParsingError(e) => write!(f, "Error on parsing Pacman repository database: {e}"),
             RepositoryError::ValidationError(e) => write!(f, "Error on validation data: {e}"),
         }
     }

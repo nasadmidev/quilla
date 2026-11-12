@@ -4,6 +4,7 @@ use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::fs::File;
 use serde::{Serialize, Deserialize};
+use std::env::consts::ARCH;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Version {
@@ -190,6 +191,16 @@ pub enum Arch {
     X86_64,
     Aarch64,
     Any,
+}
+
+impl Arch {
+    pub fn get_architecture_by_consts() -> Self {
+        match ARCH {
+            "x86_64" => Self::X86_64,
+            "aarch64" => Self::Aarch64,
+            _ => Self::Any
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -444,7 +455,7 @@ fn is_valid_name(name: &str) -> bool {
     !name.is_empty()
         && !name.starts_with(['-', '.'])
         && name.chars().all(|c| {
-            c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '@' | '.' | '_' | '+' | '-')
+            c.is_ascii_alphanumeric() || matches!(c, '@' | '.' | '_' | '+' | '-')
         })
 }
 

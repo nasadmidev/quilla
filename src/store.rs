@@ -50,11 +50,17 @@ impl Store {
 
     fn make_immutable(&self, path: &Path) -> Result<()> {
         for entry in crate::walkdir(path)? {
-            let mut perms = fs::metadata(&entry)?.permissions();
+            let metadata = fs::symlink_metadata(&entry)
+                .map_err(|e| StoreError::MetadataError(entry.clone(), e))?;
+            if metadata.file_type().is_symlink() {
+                continue;
+            }
+
+            let mut perms = metadata.permissions();
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                let mode = if entry.is_dir() { 0o555 } else { 0o444 };
+                let mode = if metadata.is_dir() { 0o555 } else { 0o444 };
                 perms.set_mode(mode);
             }
             #[cfg(not(unix))]
@@ -76,6 +82,7 @@ impl Store {
 pub enum StoreError {
     CreateStorageError(PathBuf, std::io::Error),
     DirectoryWalkError(std::io::Error),
+    MetadataError(PathBuf, std::io::Error),
     SetPermissionsError(PathBuf, std::io::Error),
     RenameError {
         from: PathBuf,
@@ -92,6 +99,9 @@ impl std::fmt::Display for StoreError {
                 write!(f, "Error creating storage path in {path:?}: {e}")
             }
             Self::DirectoryWalkError(e) => write!(f, "Error while iterating through storage: {e}"),
+            Self::MetadataError(path, e) => {
+                write!(f, "Error while reading metadata for {path:?}: {e}")
+            }
             Self::SetPermissionsError(path, e) => {
                 write!(f, "Cannot be applied immutable permission in {path:?}: {e}")
             }

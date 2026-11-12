@@ -1,4 +1,5 @@
 use crate::{Error, Result};
+use std::{env};
 
 #[derive(Debug)]
 pub enum Command {
@@ -9,7 +10,7 @@ pub enum Command {
 }
 
 pub fn parse() -> Result<Command> {
-    let mut args = std::env::args().skip(1);
+    let mut args = env::args().skip(1);
     let sub = args.next().ok_or_else(|| Error::InvalidArgs("No subcommand defined".into()))?;
     let rest: Vec<String> = args.collect();
 

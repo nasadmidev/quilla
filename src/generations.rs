@@ -248,6 +248,12 @@ fn merge_package(package_root: &Path, source_dir: &Path, generation_root: &Path)
         let relative = source
             .strip_prefix(package_root)
             .expect("walked package path must remain beneath its root");
+        if matches!(
+            relative.to_str(),
+            Some(".BUILDINFO" | ".MTREE" | ".PKGINFO" | ".INSTALL")
+        ) {
+            continue;
+        }
         let destination = generation_root.join(relative);
         let metadata =
             fs::symlink_metadata(&source).map_err(|source_error| GenerationError::ReadPackage {
