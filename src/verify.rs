@@ -6,7 +6,7 @@ use std::io::Read;
 use std::path::Path;
 
 /// Compare the hash of the temporary file with the one obtained from the repository.
-pub fn check_hash<P: AsRef<Path>>(path: P, record: &RepositoryRecord) -> Result<bool> {
+pub fn check_hash<P: AsRef<Path>>(path: P, record: &RepositoryRecord) -> Result<()> {
     let mut file = File::open(&path).map_err(|e| VerifyError::FileOpening(e.to_string()))?;
     let mut hasher = Sha256::new();
     let mut buffer: [u8; 8192] = [0u8; 8192];
@@ -28,7 +28,7 @@ pub fn check_hash<P: AsRef<Path>>(path: P, record: &RepositoryRecord) -> Result<
         .collect();
 
     if result.to_ascii_lowercase() == record.sha256.to_ascii_lowercase() {
-        Ok(true)
+        Ok(())
     } else {
         Err(VerifyError::InvalidHash.into())
     }

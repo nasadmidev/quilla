@@ -124,6 +124,29 @@ impl GenerationManager {
         Ok(())
     }
 
+    pub fn deactivate(&self) -> Result<()> {
+        let current = self.profile_dir.join("current");
+
+        match fs::read_link(&current) {
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(source) => {
+                return Err(GenerationError::ReadActiveLink {
+                    path: current,
+                    source,
+                }
+                .into());
+            }
+        }
+
+        fs::remove_file(&current).map_err(|source| GenerationError::Deactivate {
+            path: current,
+            source,
+        })?;
+
+        Ok(())
+    }
+
     pub fn list_generations(&self) -> Result<Vec<Generation>> {
         let current_number = self.current_generation_number()?;
         let mut generations = Vec::new();
@@ -188,7 +211,7 @@ impl GenerationManager {
             .ok_or_else(|| GenerationError::GenerationNumberOverflow.into())
     }
 
-    fn current_generation_number(&self) -> Result<Option<u64>> {
+    pub fn current_generation_number(&self) -> Result<Option<u64>> {
         let current = self.profile_dir.join("current");
         let target = match fs::read_link(&current) {
             Ok(target) => target,
@@ -330,6 +353,10 @@ pub enum GenerationError {
     NoCurrentGeneration,
     NoPreviousGeneration(u64),
     GenerationNumberOverflow,
+    Deactivate {
+        path: PathBuf,
+        source: std::io::Error,
+    },
 }
 
 impl std::fmt::Display for GenerationError {
@@ -378,6 +405,9 @@ impl std::fmt::Display for GenerationError {
                 write!(f, "generation {number} has no previous generation")
             }
             Self::GenerationNumberOverflow => write!(f, "generation number overflow"),
+            Self::Deactivate { path, source } => {
+                write!(f, "cannot deactivate profile link at {path:?}: {source}")
+            }
         }
     }
 }

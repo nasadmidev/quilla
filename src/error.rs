@@ -5,6 +5,7 @@ use crate::store::StoreError;
 use crate::generations::GenerationError;
 use crate::package::PackageError;
 use crate::verify::VerifyError;
+use crate::transaction::TransactionError;
 use std::fmt::Display;
 use std::io;
 
@@ -20,6 +21,8 @@ pub enum Error {
     Resolver(ResolverError),
     Fetch(FetchError),
     Verify(VerifyError),
+    Configuration(String),
+    Transaction(TransactionError),
 }
 
 impl Display for Error {
@@ -34,7 +37,9 @@ impl Display for Error {
             Error::Repository(e) => write!(f, "Repository Error: {e}"),
             Error::Resolver(e) => write!(f, "Resolver Error: {e}"),
             Error::Fetch(e) => write!(f, "Fetching error: {e}"),
-            Error::Verify(e) => write!(f,  "Verify error: {e}")
+            Error::Verify(e) => write!(f,  "Verify error: {e}"),
+            Error::Configuration(e) => write!(f, "Configuration error: {e}"),
+            Error::Transaction(e) => write!(f, "Transaction error: {e}"),
         }
     }
 }

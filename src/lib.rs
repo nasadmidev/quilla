@@ -10,6 +10,7 @@ pub mod repo;
 pub mod resolver;
 pub mod fetch;
 pub mod verify;
+pub mod transaction;
 use store::StoreError;
 pub use error::{Error, Result};
 

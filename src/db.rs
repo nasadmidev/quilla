@@ -2,7 +2,7 @@ use crate::package::PackageMeta;
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
@@ -62,9 +62,22 @@ impl Database {
     }
 
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let file = File::create(path)?;
-        serde_json::to_writer_pretty(file, self).map_err(|e| Error::Database(e.to_string()))?;
-        Ok(())
+        let path = path.as_ref();
+        let temp_path = path.with_extension(format!("{}.tmp", std::process::id()));
+
+        let write_result = (|| {
+            let mut file = File::create(&temp_path).map_err(|e| Error::Io(e))?;
+            serde_json::to_writer_pretty(&mut file, self)
+                .map_err(|e| Error::Database(e.to_string()))?;
+            file.sync_all().map_err(|e| Error::Io(e))?;
+            fs::rename(&temp_path, path)?;
+            Ok(())
+        })();
+
+        if write_result.is_err() {
+            let _ = fs::remove_file(&temp_path);
+        }
+        write_result
     }
 
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
@@ -103,7 +116,9 @@ impl Database {
     fn validate(&self) -> Result<()> {
         if let Some(number) = self.current_generation {
             if !self.generations.contains_key(&number) {
-                return Err(Error::Database(format!("Current generation {number} is not in generations")));
+                return Err(Error::Database(format!(
+                    "Current generation {number} is not in generations"
+                )));
             }
         }
 

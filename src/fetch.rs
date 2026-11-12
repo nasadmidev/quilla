@@ -20,6 +20,8 @@ impl Fetcher {
         })
     }
 
+    pub fn cache_dir(&self) -> &PathBuf { &self.cache_dir }
+
     pub fn download(&self, url: &str, file_name: &str) -> Result<(PathBuf, PathBuf)> {
         let mut components = Path::new(file_name).components();
         if !matches!(components.next(), Some(Component::Normal(_))) || components.next().is_some() {
@@ -33,8 +35,8 @@ impl Fetcher {
             .and_then(Response::error_for_status)
             .map_err(|e| FetchError::RequestFailed(e.to_string()))?;
 
-        let temp_path = self.cache_dir.join(format!("{file_name}.temp.pkg.tar.zst"));
-        let final_path = self.cache_dir.join(format!("{file_name}.pkg.tar.zst"));
+        let temp_path = self.cache_dir.join(format!("{file_name}.part"));
+        let final_path = self.cache_dir.join(format!("{file_name}"));
         let mut file =
             File::create(&temp_path).map_err(|e| FetchError::SavingFile(e.to_string()))?;
 
