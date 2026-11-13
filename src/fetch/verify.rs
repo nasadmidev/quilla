@@ -1,4 +1,4 @@
-use crate::repo::RepositoryRecord;
+use crate::core::repo::RepositoryRecord;
 use crate::{Error, Result};
 use sha2::{Digest, Sha256};
 use std::fs::File;

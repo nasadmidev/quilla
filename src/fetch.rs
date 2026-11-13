@@ -3,6 +3,7 @@ use reqwest::blocking::{Client, Response};
 use std::fs::{self, File};
 use std::io;
 use std::path::{Component, Path, PathBuf};
+pub mod verify;
 
 pub struct Fetcher {
     client: Client,

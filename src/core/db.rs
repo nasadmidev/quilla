@@ -1,4 +1,4 @@
-use crate::package::PackageMeta;
+use crate::core::package::PackageMeta;
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

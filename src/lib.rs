@@ -1,19 +1,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-pub mod error;
-pub mod cli;
-pub mod generations;
-pub mod package;
-pub mod store;
-pub mod db;
-pub mod repo;
-pub mod resolver;
+pub mod core;
 pub mod fetch;
-pub mod verify;
-pub mod transaction;
-pub mod config;
-use store::StoreError;
-pub use error::{Error, Result};
+pub mod utils;
+use core::store::StoreError;
+pub use utils::error::{Error, Result};
 
 
 pub fn walkdir(dir: &Path) -> Result<Vec<PathBuf>> {

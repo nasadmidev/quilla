@@ -1,11 +1,11 @@
 use quilla::{Result, Error};
-use quilla::cli::{self, Command};
-use quilla::config::Config;
-use quilla::db::Database;
+use quilla::utils::cli::{self, Command};
+use quilla::utils::config::Config;
+use quilla::core::db::Database;
 use quilla::fetch::Fetcher;
-use quilla::package::{Arch, Constraint, Dependency};
-use quilla::repo::{Catalog, Repository};
-use quilla::transaction::Transaction;
+use quilla::core::package::{Arch, Constraint, Dependency};
+use quilla::core::repo::{Catalog, Repository};
+use quilla::core::transaction::Transaction;
 use std::env;
 use std::path::PathBuf;
 use std::process::ExitCode;

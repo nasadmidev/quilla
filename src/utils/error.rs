@@ -1,11 +1,11 @@
 use crate::fetch::FetchError;
-use crate::repo::RepositoryError;
-use crate::resolver::ResolverError;
-use crate::store::StoreError;
-use crate::generations::GenerationError;
-use crate::package::PackageError;
-use crate::verify::VerifyError;
-use crate::transaction::TransactionError;
+use crate::core::repo::RepositoryError;
+use crate::core::resolver::ResolverError;
+use crate::core::store::StoreError;
+use crate::core::generations::GenerationError;
+use crate::core::package::PackageError;
+use crate::fetch::verify::VerifyError;
+use crate::core::transaction::TransactionError;
 use std::fmt::Display;
 use std::io;
 

@@ -1,6 +1,6 @@
-use crate::db::{Database, GenerationRecord};
-use crate::package::{Arch, Constraint, Dependency, PackageMeta};
-use crate::repo::{Catalog, Repository, RepositoryRecord};
+use crate::core::db::{Database, GenerationRecord};
+use crate::core::package::{Arch, Constraint, Dependency, PackageMeta};
+use crate::core::repo::{Catalog, Repository, RepositoryRecord};
 use crate::{Error, Result};
 use std::collections::BTreeMap;
 use std::cmp::Ordering;

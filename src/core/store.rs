@@ -1,4 +1,4 @@
-use crate::package::{Arch, PackageMeta};
+use crate::core::package::{Arch, PackageMeta};
 use crate::{Error, Result};
 use sha2::{Digest, Sha256};
 use std::fs;

@@ -1,4 +1,4 @@
-use crate::package::{Dependency, PackageMeta};
+use crate::core::package::{Dependency, PackageMeta};
 use crate::{Error, Result};
 use hex;
 use serde::{Deserialize, Serialize};
@@ -121,10 +121,11 @@ fn parse_repository_record(desc: &str) -> Result<RepositoryRecord> {
 
     let name = required_field(&fields, "NAME")?.to_string();
     let version = required_field(&fields, "VERSION")?.parse()?;
+    use crate::core::package::Arch;
     let arch = match required_field(&fields, "ARCH")? {
-        "x86_64" => crate::package::Arch::X86_64,
-        "aarch64" => crate::package::Arch::Aarch64,
-        "any" => crate::package::Arch::Any,
+        "x86_64" => Arch::X86_64,
+        "aarch64" => Arch::Aarch64,
+        "any" => Arch::Any,
         other => {
             return Err(RepositoryError::ValidationError(format!(
                 "unsupported package architecture `{other}` for `{name}`"
