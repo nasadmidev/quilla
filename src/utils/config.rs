@@ -2,6 +2,7 @@ use crate::{Result, Error};
 use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use toml;
+use std::env;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -73,4 +74,21 @@ mod tests {
         std::fs::remove_file(&path).unwrap();
         assert!(Config::load(path).is_err());
     }
+}
+
+pub fn parse_config() -> Result<PathBuf> {
+    let config_path = match env::var("QUILLA_CONFIG") {
+        Ok(s) => PathBuf::from(s),
+        Err(_) => {
+            let home = match env::var("HOME") {
+                Ok(s) => s,
+                Err(_) => {
+                    eprintln!("Could not retrieve the user's home directory");
+                    return Err(Error::Configuration("Could not retrieve the user's home directory".to_string()));
+                }
+            };
+            PathBuf::from(format!("{home}/.config/quilla.config.toml"))
+        },
+    };
+    Ok(config_path)
 }

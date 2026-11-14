@@ -21,3 +21,8 @@ tar = "0.4.46"
 flate2 = "1"
 zstd = "0.14.3"
 toml = "1.2.1"
+
+[dev-dependencies]
+axum = "0.8.9"
+tower-http = { version = "0.7.1", features = ["fs"] }
+tokio = { version = "1.54.1", features = ["macros", "net", "rt-multi-thread"] }
