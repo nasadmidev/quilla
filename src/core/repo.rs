@@ -290,3 +290,74 @@ impl From<RepositoryError> for Error {
         Error::Repository(value)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_repository_record, validate, Catalog, Repository, RepositoryRecord};
+    use crate::core::package::{Arch, Dependency};
+
+    fn description() -> &'static str {
+        "%NAME%\ndemo\n%VERSION%\n1.2-3\n%ARCH%\nx86_64\n%DESC%\nDemo package\n%URL%\nhttps://example.test\n%LICENSE%\nMIT\n%DEPENDS%\nlibc>=2.0\n%ISIZE%\n42\n%FILENAME%\ndemo.pkg.tar.zst\n%SHA256SUM%\n0000000000000000000000000000000000000000000000000000000000000000\n"
+    }
+
+    fn record(name: &str) -> RepositoryRecord {
+        let mut record = parse_repository_record(description()).unwrap();
+        record.package.name = name.into();
+        record
+    }
+
+    #[test]
+    fn parses_package_description_fields_and_dependencies() {
+        let record = parse_repository_record(description()).unwrap();
+        assert_eq!(record.package.name, "demo");
+        assert_eq!(record.package.version.to_string(), "1.2-3");
+        assert_eq!(record.package.arch, Arch::X86_64);
+        assert_eq!(record.package.description, "Demo package");
+        assert_eq!(record.package.url.as_deref(), Some("https://example.test"));
+        assert_eq!(record.package.licenses, ["MIT"]);
+        assert_eq!(record.package.installed_size, 42);
+        assert_eq!(record.package.depends[0].name, "libc");
+    }
+
+    #[test]
+    fn rejects_missing_fields_and_invalid_architecture() {
+        assert!(parse_repository_record("%NAME%\ndemo\n").is_err());
+        let invalid_arch = description().replace("x86_64", "mips");
+        assert!(parse_repository_record(&invalid_arch).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_checksums_and_unsafe_archive_paths() {
+        let mut invalid_hash = record("demo");
+        invalid_hash.sha256 = "not-hex".into();
+        assert!(validate(&[invalid_hash]).is_err());
+
+        let mut traversal = record("demo");
+        traversal.archive_path = "../demo.pkg.tar.zst".into();
+        assert!(validate(&[traversal]).is_err());
+    }
+
+    #[test]
+    fn repository_finds_matching_packages_and_builds_mirror_urls() {
+        let repo = Repository {
+            name: "main".into(),
+            mirrors: vec!["https://one.test/".into(), "https://two.test".into()],
+            records: vec![record("demo"), record("other")],
+        };
+        let dependency: Dependency = "demo>=1".parse().unwrap();
+        assert_eq!(repo.find_records("demo").len(), 1);
+        assert_eq!(repo.find_satisfying(&dependency).len(), 1);
+        assert_eq!(repo.download_urls(&repo.records[0]), [
+            "https://one.test/demo.pkg.tar.zst",
+            "https://two.test/demo.pkg.tar.zst"
+        ]);
+    }
+
+    #[test]
+    fn catalog_rejects_duplicate_repository_names() {
+        let repo = Repository { name: "main".into(), mirrors: vec![], records: vec![] };
+        let mut catalog = Catalog { repositories: vec![] };
+        catalog.add_repository(repo.clone()).unwrap();
+        assert!(catalog.add_repository(repo).is_err());
+    }
+}

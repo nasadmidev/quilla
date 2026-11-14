@@ -423,3 +423,66 @@ impl From<GenerationError> for Error {
         Error::Generation(error)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::GenerationManager;
+    use std::{path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+
+    fn temp_dir(label: &str) -> PathBuf {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        std::env::temp_dir().join(format!("quilla-{label}-{}-{nonce}", std::process::id()))
+    }
+
+    #[test]
+    fn creates_and_activates_generation_links() {
+        let root = temp_dir("generation");
+        let manager = GenerationManager::new(&root).unwrap();
+        let package = temp_dir("package");
+        std::fs::create_dir_all(package.join("usr/bin")).unwrap();
+        std::fs::write(package.join("usr/bin/demo"), "demo").unwrap();
+        std::fs::write(package.join(".PKGINFO"), "metadata").unwrap();
+
+        let generation = manager.create_generation(&[&package]).unwrap();
+        assert_eq!(generation.number, 1);
+        assert!(generation.path.join("usr/bin/demo").is_symlink());
+        assert!(!generation.path.join(".PKGINFO").exists());
+        manager.activate(generation.number).unwrap();
+        assert_eq!(manager.current_generation_number().unwrap(), Some(1));
+        assert!(manager.list_generations().unwrap()[0].is_current);
+
+        std::fs::remove_dir_all(root).unwrap();
+        std::fs::remove_dir_all(package).unwrap();
+    }
+
+    #[test]
+    fn rollback_activates_the_previous_generation_and_deactivate_is_idempotent() {
+        let root = temp_dir("rollback");
+        let manager = GenerationManager::new(&root).unwrap();
+        let first = manager.create_generation::<PathBuf>(&[]).unwrap();
+        let second = manager.create_generation::<PathBuf>(&[]).unwrap();
+        manager.activate(second.number).unwrap();
+
+        let rolled_back = manager.rollback().unwrap();
+        assert_eq!(rolled_back.number, first.number);
+        assert!(rolled_back.is_current);
+        assert_eq!(manager.current_generation_number().unwrap(), Some(first.number));
+        manager.deactivate().unwrap();
+        manager.deactivate().unwrap();
+        assert_eq!(manager.current_generation_number().unwrap(), None);
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_rollback_without_current_or_previous_generation() {
+        let root = temp_dir("rollback-errors");
+        let manager = GenerationManager::new(&root).unwrap();
+        assert!(manager.rollback().is_err());
+        let only = manager.create_generation::<PathBuf>(&[]).unwrap();
+        manager.activate(only.number).unwrap();
+        assert!(manager.rollback().is_err());
+        assert!(manager.activate(only.number + 1).is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}

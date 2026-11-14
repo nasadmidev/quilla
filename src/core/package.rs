@@ -1,8 +1,6 @@
-use crate::{ Error, Result };
+use crate::{ Error };
 use std::cmp::Ordering;
-use std::io::{BufRead, BufReader};
 use std::str::FromStr;
-use std::fs::File;
 use serde::{Serialize, Deserialize};
 use std::env::consts::ARCH;
 
@@ -250,7 +248,7 @@ impl PackageMeta {
         })
     }
 
-    pub fn parse(pkg: File) -> Result<Self>  {
+    /* pub fn parse(pkg: File) -> Result<Self>  {
         let mut package = Self {
             name: String::new(),
             version: Version { epoch: 0, upstream: "".into(), release: None },
@@ -337,7 +335,7 @@ impl PackageMeta {
         }
 
         Ok(package)
-    }
+    } */
 }
 
 #[derive(Debug)]
@@ -476,14 +474,14 @@ fn is_valid_name(name: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use std::cmp::Ordering::*;
 
-    fn v(s: &str) -> Version {
+    pub fn v(s: &str) -> Version {
         s.parse().unwrap()
     }
-    fn d(s: &str) -> Dependency {
+    pub fn d(s: &str) -> Dependency {
         s.parse().unwrap()
     }
 

@@ -86,3 +86,20 @@ impl From<FetchError> for Error {
 }
 
 impl std::error::Error for FetchError {}
+
+#[cfg(test)]
+mod tests {
+    use super::{FetchError, Fetcher};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn rejects_file_names_that_could_escape_the_cache() {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let cache = std::env::temp_dir().join(format!("quilla-fetch-{}-{nonce}", std::process::id()));
+        let fetcher = Fetcher::new(&cache).unwrap();
+        for name in ["../outside", "/absolute", "nested/file", ""] {
+            assert!(matches!(fetcher.download("http://127.0.0.1:1", name), Err(crate::Error::Fetch(FetchError::InvalidFileName))));
+        }
+        std::fs::remove_dir_all(cache).unwrap();
+    }
+}

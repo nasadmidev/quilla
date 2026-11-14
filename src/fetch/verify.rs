@@ -58,3 +58,57 @@ impl std::fmt::Display for VerifyError {
 }
 
 impl std::error::Error for VerifyError {}
+
+#[cfg(test)]
+mod tests {
+    use super::check_hash;
+    use crate::core::package::{self, Arch, PackageMeta};
+    use crate::core::repo::RepositoryRecord;
+    use sha2::{Digest, Sha256};
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_file() -> PathBuf {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        std::env::temp_dir().join(format!("quilla-verify-{}-{nonce}", std::process::id()))
+    }
+
+    fn record(hash: String) -> RepositoryRecord {
+        RepositoryRecord {
+            package: PackageMeta {
+                name: "demo".into(),
+                version: package::tests::v("1.0-1"),
+                provides: vec![],
+                arch: Arch::Any,
+                description: "demo".into(),
+                depends: vec![],
+                licenses: vec![],
+                url: None,
+                installed_size: 0,
+                conflicts: vec![],
+                replaces: vec![],
+            },
+            archive_path: "demo.pkg.tar.zst".into(),
+            sha256: hash,
+        }
+    }
+
+    #[test]
+    fn accepts_matching_sha256_case_insensitively() {
+        let path = temp_file();
+        std::fs::write(&path, b"package bytes").unwrap();
+        let hash = hex::encode(Sha256::digest(b"package bytes")).to_uppercase();
+
+        assert!(check_hash(&path, &record(hash)).is_ok());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_mismatched_sha256_and_missing_file() {
+        let path = temp_file();
+        std::fs::write(&path, b"package bytes").unwrap();
+        assert!(check_hash(&path, &record("00".repeat(32))).is_err());
+        std::fs::remove_file(&path).unwrap();
+        assert!(check_hash(&path, &record("00".repeat(32))).is_err());
+    }
+}

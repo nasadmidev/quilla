@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstalledPackage {
-    metadata: PackageMeta,
-    store_path: PathBuf,
+    pub metadata: PackageMeta,
+    pub store_path: PathBuf,
 }
 
 impl InstalledPackage {
@@ -30,8 +30,8 @@ impl InstalledPackage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerationRecord {
-    number: u64,
-    packages: BTreeMap<String, InstalledPackage>,
+    pub number: u64,
+    pub packages: BTreeMap<String, InstalledPackage>,
 }
 
 impl GenerationRecord {
@@ -49,8 +49,8 @@ impl GenerationRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Database {
-    current_generation: Option<u64>,
-    generations: BTreeMap<u64, GenerationRecord>,
+    pub current_generation: Option<u64>,
+    pub generations: BTreeMap<u64, GenerationRecord>,
 }
 
 impl Database {
@@ -132,5 +132,195 @@ impl Database {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Database, GenerationRecord, InstalledPackage};
+    use std::{
+        collections::BTreeMap,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+    use crate::core::package::{Arch, PackageMeta};
+
+    fn temporary_database_path() -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("quilla-db-{}-{nonce}.json", std::process::id()))
+    }
+
+    fn bash_generation(number: u64) -> GenerationRecord {
+        let bash = PackageMeta {
+            name: "bash".into(),
+            version: crate::core::package::tests::v("5.2.37-1"),
+            provides: vec![crate::core::package::tests::d("sh=5.2")],
+            arch: Arch::X86_64,
+            description: "GNU Shell".into(),
+            depends: vec![],
+            licenses: vec![],
+            url: None,
+            installed_size: 3600,
+            conflicts: vec![],
+            replaces: vec![],
+        };
+        let packages = BTreeMap::from([(
+            "bash".to_string(),
+            InstalledPackage::new(bash, PathBuf::from("/store/bash")),
+        )]);
+        GenerationRecord::new(number, packages)
+    }
+
+    #[test]
+    fn should_save_database() {
+        let path = temporary_database_path();
+        let db = Database::new();
+        let result = db.save(&path);
+        assert!(result.is_ok());
+        assert!(path.is_file());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn should_load_saved_database_with_current_generation() {
+        let path = temporary_database_path();
+        let mut db = Database::new();
+        db.register(bash_generation(1)).unwrap();
+        db.set_current_generation(1).unwrap();
+        db.save(&path).unwrap();
+
+        let loaded = Database::load(&path).unwrap();
+
+        assert_eq!(loaded.current_generation, Some(1));
+        assert_eq!(loaded.get_current_generation().unwrap().number(), 1);
+        assert_eq!(
+            loaded.get_current_generation().unwrap().packages()["bash"].store_path(),
+            &PathBuf::from("/store/bash")
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn should_reject_loaded_database_with_missing_current_generation() {
+        let path = temporary_database_path();
+        let db = Database {
+            current_generation: Some(1),
+            generations: BTreeMap::new(),
+        };
+        db.save(&path).unwrap();
+
+        assert!(Database::load(&path).is_err());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn should_reject_loaded_database_with_mismatched_generation_key() {
+        let path = temporary_database_path();
+        let db = Database {
+            current_generation: None,
+            generations: BTreeMap::from([(1, bash_generation(2))]),
+        };
+        db.save(&path).unwrap();
+
+        assert!(Database::load(&path).is_err());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn should_register_generation() {
+        let bash = PackageMeta {
+            name: "bash".into(),
+            version: crate::core::package::tests::v("5.2.37-1"),
+            provides: vec![crate::core::package::tests::d("sh=5.2")],
+            arch: Arch::X86_64,
+            description: "GNU Shell".into(),
+            depends: vec![],
+            licenses: vec![],
+            url: None,
+            installed_size: 3600,
+            conflicts: vec![],
+            replaces: vec![],
+        };
+        let mut db = Database::new();
+        let mut packages: BTreeMap<String, InstalledPackage> = BTreeMap::new();
+        packages.insert("bash".to_string(), InstalledPackage::new(bash, PathBuf::new()));
+        let record = GenerationRecord { number: 1, packages };
+        let result = db.register(record);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn should_fail_in_register_generation() {
+        let bash = PackageMeta {
+            name: "bash".into(),
+            version: crate::core::package::tests::v("5.2.37-1"),
+            provides: vec![crate::core::package::tests::d("sh=5.2")],
+            arch: Arch::X86_64,
+            description: "GNU Shell".into(),
+            depends: vec![],
+            licenses: vec![],
+            url: None,
+            installed_size: 3600,
+            conflicts: vec![],
+            replaces: vec![],
+        };
+        let mut db = Database::new();
+        let mut packages: BTreeMap<String, InstalledPackage> = BTreeMap::new();
+        packages.insert("bash".to_string(), InstalledPackage::new(bash, PathBuf::new()));
+        let record = GenerationRecord { number: 1, packages };
+        let _ = db.register(record.clone()).unwrap();
+        let result = db.register(record);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn should_set_current_generation() {
+        let bash = PackageMeta {
+            name: "bash".into(),
+            version: crate::core::package::tests::v("5.2.37-1"),
+            provides: vec![crate::core::package::tests::d("sh=5.2")],
+            arch: Arch::X86_64,
+            description: "GNU Shell".into(),
+            depends: vec![],
+            licenses: vec![],
+            url: None,
+            installed_size: 3600,
+            conflicts: vec![],
+            replaces: vec![],
+        };
+        let mut db = Database::new();
+        let mut packages: BTreeMap<String, InstalledPackage> = BTreeMap::new();
+        packages.insert("bash".to_string(), InstalledPackage::new(bash, PathBuf::new()));
+        let record = GenerationRecord { number: 1, packages };
+        let _ = db.register(record).unwrap();
+        let result = db.set_current_generation(1);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn should_fail_in_set_current_generation() {
+        let bash = PackageMeta {
+            name: "bash".into(),
+            version: crate::core::package::tests::v("5.2.37-1"),
+            provides: vec![crate::core::package::tests::d("sh=5.2")],
+            arch: Arch::X86_64,
+            description: "GNU Shell".into(),
+            depends: vec![],
+            licenses: vec![],
+            url: None,
+            installed_size: 3600,
+            conflicts: vec![],
+            replaces: vec![],
+        };
+        let mut db = Database::new();
+        let mut packages: BTreeMap<String, InstalledPackage> = BTreeMap::new();
+        packages.insert("bash".to_string(), InstalledPackage::new(bash, PathBuf::new()));
+        let record = GenerationRecord { number: 2, packages };
+        let _ = db.register(record).unwrap();
+        let result = db.set_current_generation(1);
+        assert!(result.is_err());
     }
 }

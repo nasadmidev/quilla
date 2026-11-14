@@ -31,3 +31,46 @@ impl Config {
         Ok(config)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Config;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn write_config(contents: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let path = std::env::temp_dir().join(format!("quilla-config-{}-{nonce}.toml", std::process::id()));
+        std::fs::write(&path, contents).unwrap();
+        path
+    }
+
+    #[test]
+    fn loads_paths_and_repository_settings() {
+        let path = write_config(r#"
+            [paths]
+            cache_dir = "/tmp/cache"
+            store_dir = "/tmp/store"
+            profile_dir = "/tmp/profile"
+            database_path = "/tmp/db.json"
+
+            [[repositories]]
+            name = "main"
+            mirrors = ["https://mirror.test/$repo/$arch"]
+            index_path = "core.db"
+        "#);
+        let config = Config::load(&path).unwrap();
+        assert_eq!(config.paths.cache_dir, std::path::Path::new("/tmp/cache"));
+        assert_eq!(config.repositories[0].name, "main");
+        assert_eq!(config.repositories[0].mirrors[0], "https://mirror.test/$repo/$arch");
+        assert_eq!(config.repositories[0].index_path, "core.db");
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_toml_and_missing_file() {
+        let path = write_config("not = [valid");
+        assert!(Config::load(&path).is_err());
+        std::fs::remove_file(&path).unwrap();
+        assert!(Config::load(path).is_err());
+    }
+}
