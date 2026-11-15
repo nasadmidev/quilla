@@ -355,8 +355,20 @@ mod test {
         let (bash, _, _, catalog) = create_catalog();
         let mut installed_package: BTreeMap<String, InstalledPackage> = BTreeMap::new();
         let mut generation_map: BTreeMap<u64, GenerationRecord> = BTreeMap::new();
-        installed_package.insert("other_package".to_string(), InstalledPackage { metadata: bash, store_path: PathBuf::new() });
-        generation_map.insert(1, GenerationRecord { number: 1, packages: installed_package });
+        installed_package.insert(
+            "other_package".to_string(),
+            InstalledPackage {
+                metadata: bash,
+                store_path: PathBuf::new(),
+            },
+        );
+        generation_map.insert(
+            1,
+            GenerationRecord {
+                number: 1,
+                packages: installed_package,
+            },
+        );
         let db = Database {
             current_generation: Some(1),
             generations: generation_map,

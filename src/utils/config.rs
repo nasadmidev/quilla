@@ -1,8 +1,8 @@
-use crate::{Result, Error};
-use std::path::{Path, PathBuf};
+use crate::{Error, Result};
 use serde::Deserialize;
-use toml;
 use std::env;
+use std::path::{Path, PathBuf};
+use toml;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -27,8 +27,10 @@ pub struct RepositoryConfig {
 
 impl Config {
     pub fn load<P: AsRef<Path>>(config_path: P) -> Result<Self> {
-        let contents = std::fs::read_to_string(config_path).map_err(|e| Error::Configuration(e.to_string()))?;
-        let config: Config = toml::from_str(&contents).map_err(|e| Error::Configuration(e.to_string()))?;
+        let contents = std::fs::read_to_string(config_path)
+            .map_err(|e| Error::Configuration(e.to_string()))?;
+        let config: Config =
+            toml::from_str(&contents).map_err(|e| Error::Configuration(e.to_string()))?;
         Ok(config)
     }
 }
@@ -39,15 +41,20 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn write_config(contents: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("quilla-config-{}-{nonce}.toml", std::process::id()));
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path =
+            std::env::temp_dir().join(format!("quilla-config-{}-{nonce}.toml", std::process::id()));
         std::fs::write(&path, contents).unwrap();
         path
     }
 
     #[test]
     fn loads_paths_and_repository_settings() {
-        let path = write_config(r#"
+        let path = write_config(
+            r#"
             [paths]
             cache_dir = "/tmp/cache"
             store_dir = "/tmp/store"
@@ -58,11 +65,15 @@ mod tests {
             name = "main"
             mirrors = ["https://mirror.test/$repo/$arch"]
             index_path = "core.db"
-        "#);
+        "#,
+        );
         let config = Config::load(&path).unwrap();
         assert_eq!(config.paths.cache_dir, std::path::Path::new("/tmp/cache"));
         assert_eq!(config.repositories[0].name, "main");
-        assert_eq!(config.repositories[0].mirrors[0], "https://mirror.test/$repo/$arch");
+        assert_eq!(
+            config.repositories[0].mirrors[0],
+            "https://mirror.test/$repo/$arch"
+        );
         assert_eq!(config.repositories[0].index_path, "core.db");
         std::fs::remove_file(path).unwrap();
     }
@@ -84,11 +95,13 @@ pub fn parse_config() -> Result<PathBuf> {
                 Ok(s) => s,
                 Err(_) => {
                     eprintln!("Could not retrieve the user's home directory");
-                    return Err(Error::Configuration("Could not retrieve the user's home directory".to_string()));
+                    return Err(Error::Configuration(
+                        "Could not retrieve the user's home directory".to_string(),
+                    ));
                 }
             };
             PathBuf::from(format!("{home}/.config/quilla.config.toml"))
-        },
+        }
     };
     Ok(config_path)
 }

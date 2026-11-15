@@ -1,8 +1,8 @@
 use crate::core::package::{Dependency, PackageMeta};
 use crate::{Error, Result};
+use flate2::read::GzDecoder;
 use hex;
 use serde::{Deserialize, Serialize};
-use flate2::read::GzDecoder;
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 use std::path::{Component, Path};
@@ -58,17 +58,18 @@ impl Repository {
     pub fn parse_index(&mut self, bytes: &[u8]) -> Result<()> {
         let decoder = GzDecoder::new(Cursor::new(bytes));
         let mut archive = Archive::new(decoder);
-        let entries = archive
-            .entries()
-            .map_err(|e| RepositoryError::ParsingError(format!("cannot read database archive: {e}")))?;
+        let entries = archive.entries().map_err(|e| {
+            RepositoryError::ParsingError(format!("cannot read database archive: {e}"))
+        })?;
 
         let mut records = Vec::new();
         for entry in entries {
-            let mut entry = entry
-                .map_err(|e| RepositoryError::ParsingError(format!("cannot read database entry: {e}")))?;
-            let entry_path = entry
-                .path()
-                .map_err(|e| RepositoryError::ParsingError(format!("invalid database entry path: {e}")))?;
+            let mut entry = entry.map_err(|e| {
+                RepositoryError::ParsingError(format!("cannot read database entry: {e}"))
+            })?;
+            let entry_path = entry.path().map_err(|e| {
+                RepositoryError::ParsingError(format!("invalid database entry path: {e}"))
+            })?;
 
             if !entry.header().entry_type().is_file()
                 || entry_path.file_name() != Some(std::ffi::OsStr::new("desc"))
@@ -77,9 +78,9 @@ impl Repository {
             }
 
             let mut desc = String::new();
-            entry
-                .read_to_string(&mut desc)
-                .map_err(|e| RepositoryError::ParsingError(format!("cannot read package description: {e}")))?;
+            entry.read_to_string(&mut desc).map_err(|e| {
+                RepositoryError::ParsingError(format!("cannot read package description: {e}"))
+            })?;
             records.push(parse_repository_record(&desc)?);
         }
 
@@ -110,7 +111,10 @@ fn parse_repository_record(desc: &str) -> Result<RepositoryRecord> {
             fields.entry(field.clone()).or_default();
             current_field = Some(field);
         } else if let Some(field) = &current_field {
-            fields.entry(field.clone()).or_default().push(line.to_string());
+            fields
+                .entry(field.clone())
+                .or_default()
+                .push(line.to_string());
         } else {
             return Err(RepositoryError::ParsingError(format!(
                 "value appears before a field header: {line}"
@@ -133,14 +137,16 @@ fn parse_repository_record(desc: &str) -> Result<RepositoryRecord> {
             .into());
         }
     };
-    let description = optional_field(&fields, "DESC").unwrap_or_default().to_string();
+    let description = optional_field(&fields, "DESC")
+        .unwrap_or_default()
+        .to_string();
     let url = optional_field(&fields, "URL")
         .filter(|value| !value.is_empty())
         .map(str::to_string);
     let licenses = field_values(&fields, "LICENSE").to_vec();
-    let installed_size = required_field(&fields, "ISIZE")?.parse::<u64>().map_err(|e| {
-        RepositoryError::ParsingError(format!("invalid ISIZE for `{name}`: {e}"))
-    })?;
+    let installed_size = required_field(&fields, "ISIZE")?
+        .parse::<u64>()
+        .map_err(|e| RepositoryError::ParsingError(format!("invalid ISIZE for `{name}`: {e}")))?;
 
     let package = PackageMeta {
         name,
@@ -185,7 +191,8 @@ fn parse_dependencies(fields: &HashMap<String, Vec<String>>, key: &str) -> Resul
         .iter()
         .map(|value| {
             Dependency::from_str(value).map_err(|e| {
-                RepositoryError::ParsingError(format!("invalid %{key}% value `{value}`: {e}")).into()
+                RepositoryError::ParsingError(format!("invalid %{key}% value `{value}`: {e}"))
+                    .into()
             })
         })
         .collect()
@@ -279,7 +286,9 @@ pub enum RepositoryError {
 impl std::fmt::Display for RepositoryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RepositoryError::ParsingError(e) => write!(f, "Error on parsing Pacman repository database: {e}"),
+            RepositoryError::ParsingError(e) => {
+                write!(f, "Error on parsing Pacman repository database: {e}")
+            }
             RepositoryError::ValidationError(e) => write!(f, "Error on validation data: {e}"),
         }
     }
@@ -293,7 +302,7 @@ impl From<RepositoryError> for Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_repository_record, validate, Catalog, Repository, RepositoryRecord};
+    use super::{Catalog, Repository, RepositoryRecord, parse_repository_record, validate};
     use crate::core::package::{Arch, Dependency};
 
     fn description() -> &'static str {
@@ -347,16 +356,25 @@ mod tests {
         let dependency: Dependency = "demo>=1".parse().unwrap();
         assert_eq!(repo.find_records("demo").len(), 1);
         assert_eq!(repo.find_satisfying(&dependency).len(), 1);
-        assert_eq!(repo.download_urls(&repo.records[0]), [
-            "https://one.test/demo.pkg.tar.zst",
-            "https://two.test/demo.pkg.tar.zst"
-        ]);
+        assert_eq!(
+            repo.download_urls(&repo.records[0]),
+            [
+                "https://one.test/demo.pkg.tar.zst",
+                "https://two.test/demo.pkg.tar.zst"
+            ]
+        );
     }
 
     #[test]
     fn catalog_rejects_duplicate_repository_names() {
-        let repo = Repository { name: "main".into(), mirrors: vec![], records: vec![] };
-        let mut catalog = Catalog { repositories: vec![] };
+        let repo = Repository {
+            name: "main".into(),
+            mirrors: vec![],
+            records: vec![],
+        };
+        let mut catalog = Catalog {
+            repositories: vec![],
+        };
         catalog.add_repository(repo.clone()).unwrap();
         assert!(catalog.add_repository(repo).is_err());
     }

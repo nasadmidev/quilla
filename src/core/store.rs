@@ -133,18 +133,33 @@ impl From<StoreError> for Error {
 mod tests {
     use super::Store;
     use crate::core::package::{self, Arch, PackageMeta};
-    use std::{os::unix::fs::PermissionsExt, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+    use std::{
+        os::unix::fs::PermissionsExt,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     fn temp_dir(label: &str) -> PathBuf {
-        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         std::env::temp_dir().join(format!("quilla-{label}-{}-{nonce}", std::process::id()))
     }
 
     fn package() -> PackageMeta {
         PackageMeta {
-            name: "demo".into(), version: package::tests::v("1.0-1"), provides: vec![],
-            arch: Arch::X86_64, description: String::new(), depends: vec![], licenses: vec![],
-            url: None, installed_size: 0, conflicts: vec![], replaces: vec![],
+            name: "demo".into(),
+            version: package::tests::v("1.0-1"),
+            provides: vec![],
+            arch: Arch::X86_64,
+            description: String::new(),
+            depends: vec![],
+            licenses: vec![],
+            url: None,
+            installed_size: 0,
+            conflicts: vec![],
+            replaces: vec![],
         }
     }
 
@@ -171,11 +186,18 @@ mod tests {
 
         assert!(stored.join("file").is_file());
         assert!(!source.exists());
-        let mode = std::fs::metadata(stored.join("file")).unwrap().permissions().mode();
+        let mode = std::fs::metadata(stored.join("file"))
+            .unwrap()
+            .permissions()
+            .mode();
         assert_eq!(mode & 0o222, 0);
-        assert_eq!(std::fs::metadata(&stored).unwrap().permissions().mode() & 0o222, 0);
+        assert_eq!(
+            std::fs::metadata(&stored).unwrap().permissions().mode() & 0o222,
+            0
+        );
         std::fs::set_permissions(&stored, std::fs::Permissions::from_mode(0o755)).unwrap();
-        std::fs::set_permissions(stored.join("file"), std::fs::Permissions::from_mode(0o644)).unwrap();
+        std::fs::set_permissions(stored.join("file"), std::fs::Permissions::from_mode(0o644))
+            .unwrap();
         std::fs::remove_dir_all(root).unwrap();
     }
 }

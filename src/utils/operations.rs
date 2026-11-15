@@ -1,11 +1,11 @@
-use crate::{Result, Error};
-use crate::core::package::{Arch, Dependency, Constraint};
-use crate::core::db::{Database};
-use crate::core::transaction::Transaction;
-use crate::fetch::{Fetcher};
+use crate::core::db::Database;
+use crate::core::package::{Arch, Constraint, Dependency};
 use crate::core::repo::{Catalog, Repository};
-use crate::utils::config::Config;
+use crate::core::transaction::Transaction;
+use crate::fetch::Fetcher;
 use crate::utils::cli::{self, Command};
+use crate::utils::config::Config;
+use crate::{Error, Result};
 use std::path::PathBuf;
 
 pub fn run(config_path: PathBuf) -> Result<()> {
@@ -110,11 +110,6 @@ pub fn install(config: Config, pkgs: Vec<String>) -> Result<()> {
         config.paths.store_dir,
         config.paths.profile_dir,
     )?;
-    transaction.install(
-        &dependencies,
-        &[],
-        &mut db,
-        config.paths.database_path,
-    )?;
+    transaction.install(&dependencies, &[], &mut db, config.paths.database_path)?;
     Ok(())
 }

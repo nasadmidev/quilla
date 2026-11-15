@@ -138,12 +138,12 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::{Database, GenerationRecord, InstalledPackage};
+    use crate::core::package::{Arch, PackageMeta};
     use std::{
         collections::BTreeMap,
         path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
     };
-    use crate::core::package::{Arch, PackageMeta};
 
     fn temporary_database_path() -> PathBuf {
         let nonce = SystemTime::now()
@@ -246,8 +246,14 @@ mod tests {
         };
         let mut db = Database::new();
         let mut packages: BTreeMap<String, InstalledPackage> = BTreeMap::new();
-        packages.insert("bash".to_string(), InstalledPackage::new(bash, PathBuf::new()));
-        let record = GenerationRecord { number: 1, packages };
+        packages.insert(
+            "bash".to_string(),
+            InstalledPackage::new(bash, PathBuf::new()),
+        );
+        let record = GenerationRecord {
+            number: 1,
+            packages,
+        };
         let result = db.register(record);
         assert!(result.is_ok());
     }
@@ -269,8 +275,14 @@ mod tests {
         };
         let mut db = Database::new();
         let mut packages: BTreeMap<String, InstalledPackage> = BTreeMap::new();
-        packages.insert("bash".to_string(), InstalledPackage::new(bash, PathBuf::new()));
-        let record = GenerationRecord { number: 1, packages };
+        packages.insert(
+            "bash".to_string(),
+            InstalledPackage::new(bash, PathBuf::new()),
+        );
+        let record = GenerationRecord {
+            number: 1,
+            packages,
+        };
         let _ = db.register(record.clone()).unwrap();
         let result = db.register(record);
         assert!(result.is_err());
@@ -293,8 +305,14 @@ mod tests {
         };
         let mut db = Database::new();
         let mut packages: BTreeMap<String, InstalledPackage> = BTreeMap::new();
-        packages.insert("bash".to_string(), InstalledPackage::new(bash, PathBuf::new()));
-        let record = GenerationRecord { number: 1, packages };
+        packages.insert(
+            "bash".to_string(),
+            InstalledPackage::new(bash, PathBuf::new()),
+        );
+        let record = GenerationRecord {
+            number: 1,
+            packages,
+        };
         let _ = db.register(record).unwrap();
         let result = db.set_current_generation(1);
         assert!(result.is_ok());
@@ -317,8 +335,14 @@ mod tests {
         };
         let mut db = Database::new();
         let mut packages: BTreeMap<String, InstalledPackage> = BTreeMap::new();
-        packages.insert("bash".to_string(), InstalledPackage::new(bash, PathBuf::new()));
-        let record = GenerationRecord { number: 2, packages };
+        packages.insert(
+            "bash".to_string(),
+            InstalledPackage::new(bash, PathBuf::new()),
+        );
+        let record = GenerationRecord {
+            number: 2,
+            packages,
+        };
         let _ = db.register(record).unwrap();
         let result = db.set_current_generation(1);
         assert!(result.is_err());

@@ -427,10 +427,16 @@ impl From<GenerationError> for Error {
 #[cfg(test)]
 mod tests {
     use super::GenerationManager;
-    use std::{path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+    use std::{
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     fn temp_dir(label: &str) -> PathBuf {
-        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         std::env::temp_dir().join(format!("quilla-{label}-{}-{nonce}", std::process::id()))
     }
 
@@ -466,7 +472,10 @@ mod tests {
         let rolled_back = manager.rollback().unwrap();
         assert_eq!(rolled_back.number, first.number);
         assert!(rolled_back.is_current);
-        assert_eq!(manager.current_generation_number().unwrap(), Some(first.number));
+        assert_eq!(
+            manager.current_generation_number().unwrap(),
+            Some(first.number)
+        );
         manager.deactivate().unwrap();
         manager.deactivate().unwrap();
         assert_eq!(manager.current_generation_number().unwrap(), None);

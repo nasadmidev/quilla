@@ -1,8 +1,8 @@
-use crate::{ Error };
+use crate::Error;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::str::FromStr;
-use serde::{Serialize, Deserialize};
 use std::env::consts::ARCH;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Version {
@@ -206,7 +206,7 @@ impl Arch {
         match ARCH {
             "x86_64" => Self::X86_64,
             "aarch64" => Self::Aarch64,
-            _ => Self::Any
+            _ => Self::Any,
         }
     }
 }
@@ -468,9 +468,9 @@ fn strip_zeros(s: &[u8]) -> &[u8] {
 fn is_valid_name(name: &str) -> bool {
     !name.is_empty()
         && !name.starts_with(['-', '.'])
-        && name.chars().all(|c| {
-            c.is_ascii_alphanumeric() || matches!(c, '@' | '.' | '_' | '+' | '-')
-        })
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '@' | '.' | '_' | '+' | '-'))
 }
 
 #[cfg(test)]

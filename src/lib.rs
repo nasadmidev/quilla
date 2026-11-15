@@ -6,7 +6,6 @@ pub mod utils;
 use core::store::StoreError;
 pub use utils::error::{Error, Result};
 
-
 pub fn walkdir(dir: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     let root_metadata = match fs::symlink_metadata(dir) {
@@ -37,7 +36,10 @@ mod tests {
 
     #[test]
     fn walkdir_lists_nested_entries_without_following_symlinks() {
-        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let root = std::env::temp_dir().join(format!("quilla-walk-{}-{nonce}", std::process::id()));
         std::fs::create_dir_all(root.join("nested")).unwrap();
         std::fs::write(root.join("nested/file"), "data").unwrap();
@@ -51,7 +53,11 @@ mod tests {
         assert!(paths.contains(&root.join("nested/file")));
         #[cfg(unix)]
         assert!(!paths.iter().any(|path| path.starts_with(&outside)));
-        assert!(crate::walkdir(root.join("missing").as_path()).unwrap().is_empty());
+        assert!(
+            crate::walkdir(root.join("missing").as_path())
+                .unwrap()
+                .is_empty()
+        );
 
         std::fs::remove_dir_all(root).unwrap();
         std::fs::remove_dir_all(outside).unwrap();

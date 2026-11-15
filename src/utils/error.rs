@@ -1,11 +1,11 @@
-use crate::fetch::FetchError;
+use crate::core::generations::GenerationError;
+use crate::core::package::PackageError;
 use crate::core::repo::RepositoryError;
 use crate::core::resolver::ResolverError;
 use crate::core::store::StoreError;
-use crate::core::generations::GenerationError;
-use crate::core::package::PackageError;
-use crate::fetch::verify::VerifyError;
 use crate::core::transaction::TransactionError;
+use crate::fetch::FetchError;
+use crate::fetch::verify::VerifyError;
 use std::fmt::Display;
 use std::io;
 
@@ -37,7 +37,7 @@ impl Display for Error {
             Error::Repository(e) => write!(f, "Repository Error: {e}"),
             Error::Resolver(e) => write!(f, "Resolver Error: {e}"),
             Error::Fetch(e) => write!(f, "Fetching error: {e}"),
-            Error::Verify(e) => write!(f,  "Verify error: {e}"),
+            Error::Verify(e) => write!(f, "Verify error: {e}"),
             Error::Configuration(e) => write!(f, "Configuration error: {e}"),
             Error::Transaction(e) => write!(f, "Transaction error: {e}"),
         }

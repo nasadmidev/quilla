@@ -1,5 +1,4 @@
 use crate::core::db::{Database, GenerationRecord, InstalledPackage};
-use crate::fetch::{FetchError, Fetcher};
 use crate::core::generations::GenerationManager;
 use crate::core::package::{Arch, Dependency, PackageMeta};
 use crate::core::repo::RepositoryRecord;
@@ -7,6 +6,7 @@ use crate::core::repo::{Catalog, Repository};
 use crate::core::resolver::Resolver;
 use crate::core::store::Store;
 use crate::fetch::verify;
+use crate::fetch::{FetchError, Fetcher};
 use crate::{Error, Result};
 use std::fs::{self, File};
 use std::io::BufReader;

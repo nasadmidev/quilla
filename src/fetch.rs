@@ -21,7 +21,9 @@ impl Fetcher {
         })
     }
 
-    pub fn cache_dir(&self) -> &PathBuf { &self.cache_dir }
+    pub fn cache_dir(&self) -> &PathBuf {
+        &self.cache_dir
+    }
 
     pub fn download(&self, url: &str, file_name: &str) -> Result<(PathBuf, PathBuf)> {
         let mut components = Path::new(file_name).components();
@@ -52,8 +54,15 @@ impl Fetcher {
     }
 
     pub fn download_bytes(&self, url: &str) -> Result<Vec<u8>> {
-        let response = self.client.get(url).send().and_then(Response::error_for_status).map_err(|e| FetchError::RequestFailed(e.to_string()))?;
-        let bytes = response.bytes().map_err(|e| FetchError::RequestFailed(e.to_string()))?;
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .and_then(Response::error_for_status)
+            .map_err(|e| FetchError::RequestFailed(e.to_string()))?;
+        let bytes = response
+            .bytes()
+            .map_err(|e| FetchError::RequestFailed(e.to_string()))?;
         Ok(bytes.to_vec())
     }
 }
@@ -63,7 +72,7 @@ pub enum FetchError {
     CacheDirCreation(String),
     SavingFile(String),
     InvalidFileName,
-    RequestFailed(String)
+    RequestFailed(String),
 }
 
 impl std::fmt::Display for FetchError {
@@ -94,11 +103,18 @@ mod tests {
 
     #[test]
     fn rejects_file_names_that_could_escape_the_cache() {
-        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let cache = std::env::temp_dir().join(format!("quilla-fetch-{}-{nonce}", std::process::id()));
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let cache =
+            std::env::temp_dir().join(format!("quilla-fetch-{}-{nonce}", std::process::id()));
         let fetcher = Fetcher::new(&cache).unwrap();
         for name in ["../outside", "/absolute", "nested/file", ""] {
-            assert!(matches!(fetcher.download("http://127.0.0.1:1", name), Err(crate::Error::Fetch(FetchError::InvalidFileName))));
+            assert!(matches!(
+                fetcher.download("http://127.0.0.1:1", name),
+                Err(crate::Error::Fetch(FetchError::InvalidFileName))
+            ));
         }
         std::fs::remove_dir_all(cache).unwrap();
     }
