@@ -89,16 +89,21 @@ The active profile is available at `profile_dir/current`, which points to a gene
 src/
 ├── main.rs          # Program entry point and command coordination
 ├── lib.rs           # Modules and shared utilities
-├── cli.rs           # Command-line parsing
-├── config.rs        # TOML configuration loading
-├── error.rs         # Shared error type
-├── package.rs       # Package metadata, versions, and dependencies
-├── repo.rs          # Pacman repository index parsing
-├── db.rs            # Local package and generation database
-├── resolver.rs      # Dependency and conflict resolution
-├── fetch.rs         # Downloads and cache
-├── verify.rs        # SHA-256 package checks
-├── store.rs         # Hash-based package store
-├── generations.rs   # Profile and generation creation and activation
-└── transaction.rs   # Installation workflow
+├── utils.rs         # Utils module
+├── fetch.rs         # Fetching module / Downloads and cache
+├── core.rs          # Core module
+├── core/
+├──── db.rs          # Local package and generation database
+├──── generations.rs # Profile and generation creation and activation
+├──── package.rs     # Package metadata, versions, and dependencies
+├──── repo.rs        # Pacman repository index parsing
+├──── resolver.rs    # Dependency and conflict resolution
+├──── store.rs       # Hash-based package store
+├──── transaction.rs # Installation workflow
+├── fetch/
+├──── verify.rs      # SHA-256 package checks
+├── utils/
+├──── cli.rs         # Command-line parsing
+├──── config.rs      # TOML configuration loading
+├──── error.rs       # Shared error type
 ```

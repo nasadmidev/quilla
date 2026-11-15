@@ -55,10 +55,10 @@ Quilla está en la versión preliminar `0.1.0`. Esta lista recoge el trabajo pre
 - [x] Añadir pruebas unitarias para versiones, dependencias, conflictos y selección de candidatos.
 - [x] Añadir una prueba de integración del flujo de instalación: descarga, verificación, extracción, store y generación.
 - [x] Probar fallos controlados en verificación, extracción y guardado de la base de datos durante una transacción.
-- [ ] Probar interrupciones abruptas del proceso en distintos puntos de una transacción.
+- [-] Probar interrupciones abruptas del proceso en distintos puntos de una transacción.
 - [x] Usar un repositorio y un paquete de prueba locales para que la prueba de integración no dependa de mirrors públicos.
 - [x] Probar instalaciones repetidas y verificar que paquetes, archivos y permisos del perfil sean consistentes.
-- [ ] Añadir comprobaciones automáticas de formato y compilación al flujo de desarrollo.
+- [x] Añadir comprobaciones automáticas de formato y compilación al flujo de desarrollo.
 
 ## 8. Documentación y preparación de una versión estable
 

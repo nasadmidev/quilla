@@ -89,17 +89,21 @@ El perfil activo queda en `profile_dir/current` y apunta a una generación dentr
 src/
 ├── main.rs          # Entrada del programa y coordinación de comandos
 ├── lib.rs           # Módulos y utilidades comunes
-├── cli.rs           # Lectura de comandos
-├── config.rs        # Carga de la configuración TOML
-├── error.rs         # Tipo de error común
-├── package.rs       # Metadatos, versiones y dependencias
-├── repo.rs          # Lectura de índices de repositorios Pacman
-├── db.rs            # Base de datos local de paquetes y generaciones
-├── resolver.rs      # Resolución de dependencias y conflictos
-├── fetch.rs         # Descarga y caché
-├── verify.rs        # Comprobación SHA-256 de paquetes
-├── store.rs         # Store de paquetes por hash
-├── generations.rs   # Creación y activación de perfiles y generaciones
-└── transaction.rs   # Flujo de instalación
+├── utils.rs         # Módulo de utilidades
+├── fetch.rs         # Módulo de peticiones / Descarga y caché
+├── core.rs          # Núcleo
+├── core/
+├──── db.rs          # Base de datos local de paquetes y generaciones
+├──── generations.rs # Creación y activación de perfiles y generaciones
+├──── package.rs     # Metadatos, versiones y dependencias
+├──── repo.rs        # Lectura de índices de repositorios Pacman
+├──── resolver.rs    # Resolución de dependencias y conflictos
+├──── store.rs       # Store de paquetes por hash
+├──── transaction.rs # Flujo de instalación
+├── fetch/
+├──── verify.rs      # Comprobación SHA-256 de paquetes
+├── utils/
+├──── cli.rs         # Lectura de comandos
+├──── config.rs      # Carga de la configuración TOML
+├──── error.rs       # Tipo de error común
 ```
-
