@@ -9,7 +9,7 @@ use crate::fetch::verify;
 use crate::fetch::{FetchError, Fetcher};
 use crate::{Error, Result};
 use std::fs::{self, File};
-use std::io::BufReader;
+use std::io::{self, BufReader};
 use std::path::{Component, Path, PathBuf};
 use tar::Archive;
 use zstd::stream::read::Decoder;
@@ -50,17 +50,98 @@ impl<'a> Transaction<'a> {
         let previous_generation = db.get_current_generation().map(|g| g.number());
         let packages = self.fetch_resolution_plan(dependencies, upgrade_packages, db)?;
         let stored_packages = self.save_store(packages)?;
-        self.save_generation(stored_packages, db)?;
+        let new_generation = self.save_generation(stored_packages, db)?;
         if let Err(error) = db.save(&db_path) {
-            *db = previous_db;
+            let mut option = String::new();
+            println!(
+                "Failed on saving database, select one of the following operations\n\t - revert\n\t - active\n\t - inactive"
+            );
+            let Ok(_) = io::stdin().read_line(&mut option).map_err(|e| Error::Io(e)) else {
+                eprintln!("Failed to read buffer, reverting");
+                self.revert(
+                    db,
+                    previous_db,
+                    previous_generation,
+                    new_generation,
+                    db_path,
+                )?;
+                return Err(error);
+            };
 
-            match previous_generation {
-                Some(number) => self.generations.activate(number)?,
-                None => self.generations.deactivate()?,
+            match option.trim() {
+                "active" => {
+                    eprintln!(
+                        "Warning: the database could not be saved to the default path; a backup will be used, and the packages from the current generation will remain active.
+                    ");
+                    let backup_path = format!("{:?}.bak", db_path.as_ref());
+                    if let Err(backup_err) = db.save(&backup_path) {
+                        eprintln!(
+                            "The database backup could not be created in {}: {}",
+                            backup_path,
+                            backup_err.to_string()
+                        );
+                    } else {
+                        println!(
+                            "The database backup created successfully in {}",
+                            backup_path
+                        );
+                    }
+                    return Err(error);
+                }
+                "inactive" => {
+                    match previous_generation {
+                        Some(n) => {
+                            db.set_current_generation(n)?;
+                            self.generations.activate(n)?;
+                        }
+                        None => {
+                            eprintln!("No previous generation found");
+                            self.generations.deactivate()?;
+                        }
+                    }
+                    return Err(error);
+                }
+                "revert" | _ => {
+                    if option.as_str() != "revert" {
+                        eprintln!(
+                            "Invalid option ('{}'), applying 'revert' as default.",
+                            option
+                        );
+                    }
+                    self.revert(
+                        db,
+                        previous_db,
+                        previous_generation,
+                        new_generation,
+                        db_path,
+                    )?;
+                    return Err(error);
+                }
             }
-
-            return Err(error);
         }
+        Ok(())
+    }
+
+    fn revert<P: AsRef<Path>>(
+        &self,
+        db: &mut Database,
+        previous_database: Database,
+        previous_generation: Option<u64>,
+        new_generation: u64,
+        db_path: P,
+    ) -> Result<()> {
+        *db = previous_database;
+        match previous_generation {
+            Some(n) => {
+                self.generations.activate(n)?;
+                db.set_current_generation(n)?;
+            }
+            None => {
+                self.generations.deactivate()?;
+            }
+        }
+        self.generations.remove_generation(new_generation)?;
+        db.save(db_path)?;
         Ok(())
     }
 
@@ -139,7 +220,7 @@ impl<'a> Transaction<'a> {
         Ok(stored_packages)
     }
 
-    fn save_generation(&self, stored_packages: PackagesPaths, db: &mut Database) -> Result<()> {
+    fn save_generation(&self, stored_packages: PackagesPaths, db: &mut Database) -> Result<u64> {
         let mut packages = db
             .get_current_generation()
             .map(|g| g.packages().clone())
@@ -157,7 +238,7 @@ impl<'a> Transaction<'a> {
         db.register(GenerationRecord::new(number, packages))?;
         self.generations.activate(number)?;
         db.set_current_generation(number)?;
-        Ok(())
+        Ok(number)
     }
 }
 

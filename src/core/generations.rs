@@ -94,6 +94,22 @@ impl GenerationManager {
         })
     }
 
+    pub fn remove_generation(&self, number: u64) -> Result<()> {
+        let generation_path = self.generations_dir.join(format!("{number}"));
+        if !generation_path.exists() {
+            return Err(GenerationError::GenerationNotFound(number).into());
+        }
+
+        match fs::remove_dir_all(generation_path) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(Error::Io(e));
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn activate(&self, number: u64) -> Result<()> {
         let generation_path = self.generations_dir.join(number.to_string());
         if !generation_path.is_dir() {
