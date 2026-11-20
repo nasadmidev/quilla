@@ -39,7 +39,7 @@ impl Fetcher {
             .map_err(|e| FetchError::RequestFailed(e.to_string()))?;
 
         let temp_path = self.cache_dir.join(format!("{file_name}.part"));
-        let final_path = self.cache_dir.join(format!("{file_name}"));
+        let final_path = self.cache_dir.join(file_name);
         let mut file =
             File::create(&temp_path).map_err(|e| FetchError::SavingFile(e.to_string()))?;
 

@@ -203,7 +203,7 @@ fn validate(records: &[RepositoryRecord]) -> Result<()> {
         let bytes = hex::decode(&r.sha256).map_err(|e| {
             RepositoryError::ValidationError(format!(
                 "Failed in hexadecimal decodification: {}",
-                e.to_string()
+                e
             ))
         })?;
 
@@ -225,15 +225,12 @@ fn validate(records: &[RepositoryRecord]) -> Result<()> {
         }
 
         for component in path.components() {
-            match component {
-                Component::ParentDir => {
-                    return Err(RepositoryError::ValidationError(format!(
-                        "Failed in relative path validation: {}",
-                        r.archive_path
-                    ))
-                    .into());
-                }
-                _ => (),
+            if component == Component::ParentDir {
+                return Err(RepositoryError::ValidationError(format!(
+                    "Failed in relative path validation: {}",
+                    r.archive_path
+                ))
+                .into());
             }
         }
     }

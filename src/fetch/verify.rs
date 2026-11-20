@@ -27,7 +27,7 @@ pub fn check_hash<P: AsRef<Path>>(path: P, record: &RepositoryRecord) -> Result<
         .map(|b| format!("{:02x}", b))
         .collect();
 
-    if result.to_ascii_lowercase() == record.sha256.to_ascii_lowercase() {
+    if result.eq_ignore_ascii_case(&record.sha256) {
         Ok(())
     } else {
         Err(VerifyError::InvalidHash.into())

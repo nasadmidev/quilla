@@ -66,10 +66,10 @@ impl Database {
         let temp_path = path.with_extension(format!("{}.tmp", std::process::id()));
 
         let write_result = (|| {
-            let mut file = File::create(&temp_path).map_err(|e| Error::Io(e))?;
+            let mut file = File::create(&temp_path).map_err(Error::Io)?;
             serde_json::to_writer_pretty(&mut file, self)
                 .map_err(|e| Error::Database(e.to_string()))?;
-            file.sync_all().map_err(|e| Error::Io(e))?;
+            file.sync_all().map_err(Error::Io)?;
             fs::rename(&temp_path, path)?;
             Ok(())
         })();
@@ -82,7 +82,7 @@ impl Database {
 
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let file =
-            File::open(path.as_ref().to_path_buf()).map_err(|e| Error::Database(e.to_string()))?;
+            File::open(path.as_ref()).map_err(|e| Error::Database(e.to_string()))?;
         let reader = BufReader::new(file);
         let db: Self =
             serde_json::from_reader(reader).map_err(|e| Error::Database(e.to_string()))?;
@@ -114,13 +114,12 @@ impl Database {
     }
 
     fn validate(&self) -> Result<()> {
-        if let Some(number) = self.current_generation {
-            if !self.generations.contains_key(&number) {
+        if let Some(number) = self.current_generation
+            && !self.generations.contains_key(&number) {
                 return Err(Error::Database(format!(
                     "Current generation {number} is not in generations"
                 )));
             }
-        }
 
         for (key, record) in &self.generations {
             if *key != record.number {
@@ -132,6 +131,12 @@ impl Database {
         }
 
         Ok(())
+    }
+}
+
+impl Default for Database {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

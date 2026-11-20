@@ -56,7 +56,7 @@ impl<'a> Transaction<'a> {
             println!(
                 "Failed on saving database, select one of the following operations\n\t - revert\n\t - active\n\t - inactive"
             );
-            let Ok(_) = io::stdin().read_line(&mut option).map_err(|e| Error::Io(e)) else {
+            let Ok(_) = io::stdin().read_line(&mut option).map_err(Error::Io) else {
                 eprintln!("Failed to read buffer, reverting");
                 self.revert(
                     db,
@@ -78,7 +78,7 @@ impl<'a> Transaction<'a> {
                         eprintln!(
                             "The database backup could not be created in {}: {}",
                             backup_path,
-                            backup_err.to_string()
+                            backup_err
                         );
                     } else {
                         println!(
@@ -101,8 +101,8 @@ impl<'a> Transaction<'a> {
                     }
                     return Err(error);
                 }
-                "revert" | _ => {
-                    if option.as_str() != "revert" {
+                choice => {
+                    if choice != "revert" {
                         eprintln!(
                             "Invalid option ('{}'), applying 'revert' as default.",
                             option
@@ -146,7 +146,7 @@ impl<'a> Transaction<'a> {
     }
 
     fn fetch_verified_mirror(&self, url: &str, record: &RepositoryRecord) -> Result<PathBuf> {
-        let Some(Component::Normal(name)) = Path::new(&record.archive_path).components().last()
+        let Some(Component::Normal(name)) = Path::new(&record.archive_path).components().next_back()
         else {
             return Err(FetchError::InvalidFileName.into());
         };
@@ -164,7 +164,7 @@ impl<'a> Transaction<'a> {
             Ok(_) => Ok(final_path),
             Err(e) => {
                 let _ = fs::remove_file(temp_path);
-                return Err(Error::Io(e));
+                Err(Error::Io(e))
             }
         }
     }
@@ -185,16 +185,16 @@ impl<'a> Transaction<'a> {
 
         match last_error {
             Some(e) => {
-                return Err(e);
+                Err(e)
             }
             None => {
-                return Err(Error::Configuration("No mirrors configured".to_string()));
+                Err(Error::Configuration("No mirrors configured".to_string()))
             }
-        };
+        }
     }
 
-    fn fetch_resolution_plan<'b>(
-        &'b self,
+    fn fetch_resolution_plan(
+        &self,
         dependencies: &[Dependency],
         upgrade_packages: &[String],
         db: &Database,
@@ -229,9 +229,7 @@ impl<'a> Transaction<'a> {
             let name = meta.name.clone();
             packages.insert(name, InstalledPackage::new(meta, store_path));
         }
-        let stored_paths: Vec<PathBuf> = packages
-            .iter()
-            .map(|(_, p)| p.store_path().clone())
+        let stored_paths: Vec<PathBuf> = packages.values().map(|p| p.store_path().clone())
             .collect();
         let generation = self.generations.create_generation(&stored_paths)?;
         let number = generation.number;
@@ -242,17 +240,17 @@ impl<'a> Transaction<'a> {
     }
 }
 
-fn unpack_tar(packages: PackagesPaths, cache_dir: &PathBuf) -> Result<PackagesPaths> {
+fn unpack_tar(packages: PackagesPaths, cache_dir: &Path) -> Result<PackagesPaths> {
     let mut uncompressed_packages: PackagesPaths = Vec::new();
     let extracted_root = cache_dir.join("extracted");
     for (meta, path) in packages.into_iter() {
-        let file = File::open(&path).map_err(|e| Error::Io(e))?;
+        let file = File::open(&path).map_err(Error::Io)?;
         let archive_name = path
             .file_name()
             .ok_or_else(|| Error::Configuration("Invalid archive path".to_string()))?;
 
         let extracted_folder = extracted_root.join(archive_name);
-        fs::create_dir_all(&extracted_folder).map_err(|e| Error::Io(e))?;
+        fs::create_dir_all(&extracted_folder).map_err(Error::Io)?;
         let reader = BufReader::new(file);
         let zstd_decoder =
             Decoder::new(reader).map_err(|_| TransactionError::UnpackFail(meta.name.clone()))?;

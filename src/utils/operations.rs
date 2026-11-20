@@ -79,8 +79,7 @@ pub fn install(config: Config, pkgs: Vec<String>) -> Result<()> {
                 "Could not load the repository index {}: {}",
                 repository.name,
                 last_index_error.unwrap_or_else(|| "no mirrors configured".to_string())
-            ))
-            .into());
+            )));
         }
 
         catalog.add_repository(repository)?;

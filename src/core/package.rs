@@ -123,7 +123,7 @@ impl FromStr for Dependency {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let s = s.trim();
 
-        let (name, constraint) = match s.find(|c| matches!(c, '<' | '>' | '=')) {
+        let (name, constraint) = match s.find(['<', '>', '=']) {
             None => (s, Constraint::Any),
             Some(pos) => {
                 let (name, op_and_version) = s.split_at(pos);
