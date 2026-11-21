@@ -4,6 +4,7 @@ use quilla::core::repo::{Catalog, Repository};
 use quilla::core::transaction::Transaction;
 use quilla::fetch::Fetcher;
 use quilla::utils::{config::Config, operations};
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -56,7 +57,24 @@ async fn invalid_archive_does_not_activate_or_register_a_generation() {
 }
 
 #[tokio::test]
-async fn database_save_failure_restores_the_previous_active_generation() {
+async fn database_save_failure_apply_inactive() {
+    let input = "inactive\n";
+    database_save_failure(input).await;
+}
+
+#[tokio::test]
+async fn database_save_failure_apply_revert() {
+    let input = "revert\n";
+    database_save_failure(input).await;
+}
+
+#[tokio::test]
+async fn database_save_failure_apply_active() {
+    let input = "active\n";
+    database_save_failure(input).await;
+}
+
+async fn database_save_failure(input: &str) {
     let workspace = TestWorkspace::new();
     let server_url = common::run_server(&workspace.0).await;
     run_install(&workspace.0, &server_url, vec!["pkg_test"])
@@ -73,6 +91,8 @@ async fn database_save_failure_restores_the_previous_active_generation() {
     let profile_dir = workspace.0.join("profile");
     let server_for_worker = server_url.clone();
     let saved_database_for_worker = saved_database_path.clone();
+    let input_data = input;
+    let input = Cursor::new(input.as_bytes().to_owned());
     let (error, in_memory_generation) = tokio::task::spawn_blocking(move || {
         let fetcher = Fetcher::new(&cache_dir)?;
         let index_url = format!("{server_for_worker}/core/os/x86_64/core.db");
@@ -99,7 +119,8 @@ async fn database_save_failure_restores_the_previous_active_generation() {
             name: "pkg_test".to_string(),
             constraint: Constraint::Any,
         };
-        let result = transaction.install(&[dependency], &[], &mut database, &database_path);
+
+        let result = transaction.install(input, &[dependency], &[], &mut database, &database_path);
         let current = database
             .get_current_generation()
             .map(|generation| generation.number());
@@ -117,12 +138,21 @@ async fn database_save_failure_restores_the_previous_active_generation() {
     );
     let previous_database = Database::load(&saved_database_path).unwrap();
     let previous_generation = previous_database.get_current_generation().unwrap().number();
-    assert_eq!(in_memory_generation, Some(previous_generation));
+    if input_data != "active\n" {
+        assert_eq!(in_memory_generation, Some(previous_generation));
+    }
 
     let current_link = std::fs::read_link(workspace.0.join("profile/current")).unwrap();
     assert_eq!(
         current_link,
-        PathBuf::from(format!("generations/{previous_generation}"))
+        PathBuf::from(format!(
+            "generations/{}",
+            if input_data != "active\n" {
+                previous_generation
+            } else {
+                in_memory_generation.unwrap_or(2)
+            }
+        ))
     );
 
     // The failed transaction must leave the old generation as the committed

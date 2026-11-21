@@ -1,5 +1,5 @@
 use crate::core::db::{Database, GenerationRecord, InstalledPackage};
-use crate::core::generations::GenerationManager;
+use crate::core::generations::{GenerationError, GenerationManager};
 use crate::core::package::{Arch, Dependency, PackageMeta};
 use crate::core::repo::RepositoryRecord;
 use crate::core::repo::{Catalog, Repository};
@@ -9,7 +9,7 @@ use crate::fetch::verify;
 use crate::fetch::{FetchError, Fetcher};
 use crate::{Error, Result};
 use std::fs::{self, File};
-use std::io::{self, BufReader};
+use std::io::{self, BufRead, BufReader};
 use std::path::{Component, Path, PathBuf};
 use tar::Archive;
 use zstd::stream::read::Decoder;
@@ -39,8 +39,9 @@ impl<'a> Transaction<'a> {
         })
     }
 
-    pub fn install<P: AsRef<Path>>(
+    pub fn install<P: AsRef<Path>, R: io::Read + BufRead>(
         &self,
+        mut reader: R,
         dependencies: &[Dependency],
         upgrade_packages: &[String],
         db: &mut Database,
@@ -56,7 +57,7 @@ impl<'a> Transaction<'a> {
             println!(
                 "Failed on saving database, select one of the following operations\n\t - revert\n\t - active\n\t - inactive"
             );
-            let Ok(_) = io::stdin().read_line(&mut option).map_err(Error::Io) else {
+            let Ok(_) = reader.read_line(&mut option).map_err(Error::Io) else {
                 eprintln!("Failed to read buffer, reverting");
                 self.revert(
                     db,
@@ -74,11 +75,11 @@ impl<'a> Transaction<'a> {
                         "Warning: the database could not be saved to the default path; a backup will be used, and the packages from the current generation will remain active.
                     ");
                     let backup_path = format!("{:?}.bak", db_path.as_ref());
+                    let _ = File::create(&backup_path).map_err(|e| Error::Io(e))?;
                     if let Err(backup_err) = db.save(&backup_path) {
                         eprintln!(
                             "The database backup could not be created in {}: {}",
-                            backup_path,
-                            backup_err
+                            backup_path, backup_err
                         );
                     } else {
                         println!(
@@ -119,6 +120,7 @@ impl<'a> Transaction<'a> {
                 }
             }
         }
+        reconcile_database_with_current(&self.generations, self.generations.profile_dir(), db)?;
         Ok(())
     }
 
@@ -146,7 +148,8 @@ impl<'a> Transaction<'a> {
     }
 
     fn fetch_verified_mirror(&self, url: &str, record: &RepositoryRecord) -> Result<PathBuf> {
-        let Some(Component::Normal(name)) = Path::new(&record.archive_path).components().next_back()
+        let Some(Component::Normal(name)) =
+            Path::new(&record.archive_path).components().next_back()
         else {
             return Err(FetchError::InvalidFileName.into());
         };
@@ -184,12 +187,8 @@ impl<'a> Transaction<'a> {
         }
 
         match last_error {
-            Some(e) => {
-                Err(e)
-            }
-            None => {
-                Err(Error::Configuration("No mirrors configured".to_string()))
-            }
+            Some(e) => Err(e),
+            None => Err(Error::Configuration("No mirrors configured".to_string())),
         }
     }
 
@@ -229,14 +228,87 @@ impl<'a> Transaction<'a> {
             let name = meta.name.clone();
             packages.insert(name, InstalledPackage::new(meta, store_path));
         }
-        let stored_paths: Vec<PathBuf> = packages.values().map(|p| p.store_path().clone())
-            .collect();
+        let stored_paths: Vec<PathBuf> =
+            packages.values().map(|p| p.store_path().clone()).collect();
         let generation = self.generations.create_generation(&stored_paths)?;
         let number = generation.number;
         db.register(GenerationRecord::new(number, packages))?;
         self.generations.activate(number)?;
         db.set_current_generation(number)?;
         Ok(number)
+    }
+}
+
+fn clean_interrupted_staging(generations_dir: &Path) -> Result<()> {
+    if generations_dir.exists() {
+        for entry in fs::read_dir(generations_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.ends_with("staging") {
+                        println!("Cleaning interrupted staging directory: {:?}", path);
+                        fs::remove_dir_all(&path)?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn reconcile_database_with_current(
+    generation_manager: &GenerationManager,
+    profile_dir: &Path,
+    db: &mut Database,
+) -> Result<()> {
+    let current = profile_dir.join("current");
+    let generation = fs::read_link(&current).map_err(|e| {
+        Error::Generation(GenerationError::ReadActiveLink {
+            path: current,
+            source: e,
+        })
+    })?;
+    let current_generation: Option<u64> = match generation.components().last() {
+        Some(component) => {
+            if let Some(component_as_str) = component.as_os_str().to_str() {
+                match component_as_str.parse::<u64>() {
+                    Ok(n) => Some(n),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            }
+        }
+        None => None,
+    };
+    let current_generation_database = db.get_current_generation();
+    match (current_generation, current_generation_database) {
+        (Some(generation), Some(record)) => {
+            if generation == record.number() {
+                Ok(())
+            } else {
+                generation_manager.activate(record.number())?;
+                Ok(())
+            }
+        }
+        (None, None) => Ok(()),
+        (Some(generation), None) => {
+            db.set_current_generation(generation)?;
+            Ok(())
+        }
+        (None, Some(record)) => {
+            generation_manager.activate(record.number())?;
+            Ok(())
+        }
+    }
+}
+
+impl<'a> Drop for Transaction<'a> {
+    fn drop(&mut self) {
+        if let Err(e) = clean_interrupted_staging(self.generations.generations_dir()) {
+            eprintln!("Warning: failed to clean interrupted staging directories: {e}");
+        }
     }
 }
 
@@ -266,12 +338,14 @@ fn unpack_tar(packages: PackagesPaths, cache_dir: &Path) -> Result<PackagesPaths
 #[derive(Debug)]
 pub enum TransactionError {
     UnpackFail(String),
+    ReconcileFail(String),
 }
 
 impl std::fmt::Display for TransactionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UnpackFail(name) => write!(f, "Failed on unpack package: {name}"),
+            Self::ReconcileFail(e) => write!(f, "Failed on reconcile current with database: {e}"),
         }
     }
 }

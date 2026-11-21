@@ -33,22 +33,21 @@ impl<'a> Resolver<'a> {
         let mut pending = dependencies.to_vec();
         let db_generation = db.get_current_generation();
 
-        if db_generation.is_none()
-            && !upgrade_packages.is_empty() {
-                return Err(ResolverError::UpdatingAnEmptyGeneration.into());
-            }
+        if db_generation.is_none() && !upgrade_packages.is_empty() {
+            return Err(ResolverError::UpdatingAnEmptyGeneration.into());
+        }
 
         if let Some(generation) = db_generation
             && let Some(package) = upgrade_packages
                 .iter()
                 .find(|name| !generation.packages().contains_key(*name))
-            {
-                return Err(ResolverError::PackageNotFoundOnUpdating {
-                    package: package.clone(),
-                    generation: generation.number(),
-                }
-                .into());
+        {
+            return Err(ResolverError::PackageNotFoundOnUpdating {
+                package: package.clone(),
+                generation: generation.number(),
             }
+            .into());
+        }
 
         pending.extend(upgrade_packages.iter().map(|name| Dependency {
             name: name.clone(),
@@ -65,31 +64,32 @@ impl<'a> Resolver<'a> {
 
             if !upgrade_packages.contains(&dependency.name)
                 && let Some(generation) = db_generation
-                    && generation
-                        .packages()
-                        .values()
-                        .any(|installed| installed.metadata().satisfies(&dependency))
-                    {
-                        continue;
-                    }
+                && generation
+                    .packages()
+                    .values()
+                    .any(|installed| installed.metadata().satisfies(&dependency))
+            {
+                continue;
+            }
 
             let (repository, record) = self.select_candidate(&dependency)?;
             let package_name = record.package.name.clone();
 
             if upgrade_packages.contains(&package_name)
                 && let Some(generation) = db_generation
-                    && let Some(installed) = generation.packages().get(&package_name) {
-                        match record.package.version.cmp(&installed.metadata().version) {
-                            Ordering::Less => {
-                                return Err(ResolverError::DowngradeNotAllowed {
-                                    package: package_name,
-                                }
-                                .into());
-                            }
-                            Ordering::Equal => continue,
-                            Ordering::Greater => {}
+                && let Some(installed) = generation.packages().get(&package_name)
+            {
+                match record.package.version.cmp(&installed.metadata().version) {
+                    Ordering::Less => {
+                        return Err(ResolverError::DowngradeNotAllowed {
+                            package: package_name,
                         }
+                        .into());
                     }
+                    Ordering::Equal => continue,
+                    Ordering::Greater => {}
+                }
+            }
 
             if let Some((_, existing)) = plan.packages.get(&package_name) {
                 if existing.package.satisfies(&dependency) {
@@ -261,7 +261,7 @@ impl From<ResolverError> for Error {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::collections::BTreeMap;
     use std::path::PathBuf;
 

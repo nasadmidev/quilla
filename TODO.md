@@ -30,10 +30,10 @@ Quilla está en la versión preliminar `0.1.0`. Esta lista recoge el trabajo pre
 
 ## 4. Transacciones y recuperación (Working)
 
-- [ ] Hacer que los cambios en el perfil y la base de datos se confirmen de forma coherente.
+- [x] Hacer que los cambios en el perfil y la base de datos se confirmen de forma coherente.
 - [ ] Recuperar o limpiar transacciones interrumpidas sin dejar el perfil y la base de datos en estados distintos.
-- [ ] Definir el comportamiento ante fallos en cada etapa: descarga, verificación, extracción, escritura al store, creación de generación y activación.
-- [ ] Asegurar que una generación incompleta nunca se active.
+- [x] Definir el comportamiento ante fallos en cada etapa: descarga, verificación, extracción, escritura al store, creación de generación y activación.
+- [x] Asegurar que una generación incompleta nunca se active.
 
 ## 5. Caché y almacenamiento
 

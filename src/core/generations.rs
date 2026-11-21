@@ -32,6 +32,14 @@ impl GenerationManager {
         })
     }
 
+    pub fn generations_dir(&self) -> &Path {
+        &self.generations_dir
+    }
+
+    pub fn profile_dir(&self) -> &Path {
+        &self.profile_dir
+    }
+
     pub fn create_generation<P: AsRef<Path>>(&self, package_paths: &[P]) -> Result<Generation> {
         let number = self.next_generation_number()?;
         let final_path = self.generations_dir.join(number.to_string());

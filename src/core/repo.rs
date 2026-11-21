@@ -201,10 +201,7 @@ fn parse_dependencies(fields: &HashMap<String, Vec<String>>, key: &str) -> Resul
 fn validate(records: &[RepositoryRecord]) -> Result<()> {
     for r in records {
         let bytes = hex::decode(&r.sha256).map_err(|e| {
-            RepositoryError::ValidationError(format!(
-                "Failed in hexadecimal decodification: {}",
-                e
-            ))
+            RepositoryError::ValidationError(format!("Failed in hexadecimal decodification: {}", e))
         })?;
 
         if bytes.len() != 32 {

@@ -23,6 +23,7 @@ pub enum Error {
     Verify(VerifyError),
     Configuration(String),
     Transaction(TransactionError),
+    Custom(String),
 }
 
 impl Display for Error {
@@ -40,6 +41,7 @@ impl Display for Error {
             Error::Verify(e) => write!(f, "Verify error: {e}"),
             Error::Configuration(e) => write!(f, "Configuration error: {e}"),
             Error::Transaction(e) => write!(f, "Transaction error: {e}"),
+            Error::Custom(e) => write!(f, "Error: {e}"),
         }
     }
 }

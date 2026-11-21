@@ -6,6 +6,7 @@ use crate::fetch::Fetcher;
 use crate::utils::cli::{self, Command};
 use crate::utils::config::Config;
 use crate::{Error, Result};
+use std::io;
 use std::path::PathBuf;
 
 pub fn run(config_path: PathBuf) -> Result<()> {
@@ -109,6 +110,12 @@ pub fn install(config: Config, pkgs: Vec<String>) -> Result<()> {
         config.paths.store_dir,
         config.paths.profile_dir,
     )?;
-    transaction.install(&dependencies, &[], &mut db, config.paths.database_path)?;
+    transaction.install(
+        io::stdin().lock(),
+        &dependencies,
+        &[],
+        &mut db,
+        config.paths.database_path,
+    )?;
     Ok(())
 }

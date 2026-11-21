@@ -81,8 +81,7 @@ impl Database {
     }
 
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let file =
-            File::open(path.as_ref()).map_err(|e| Error::Database(e.to_string()))?;
+        let file = File::open(path.as_ref()).map_err(|e| Error::Database(e.to_string()))?;
         let reader = BufReader::new(file);
         let db: Self =
             serde_json::from_reader(reader).map_err(|e| Error::Database(e.to_string()))?;
@@ -115,11 +114,12 @@ impl Database {
 
     fn validate(&self) -> Result<()> {
         if let Some(number) = self.current_generation
-            && !self.generations.contains_key(&number) {
-                return Err(Error::Database(format!(
-                    "Current generation {number} is not in generations"
-                )));
-            }
+            && !self.generations.contains_key(&number)
+        {
+            return Err(Error::Database(format!(
+                "Current generation {number} is not in generations"
+            )));
+        }
 
         for (key, record) in &self.generations {
             if *key != record.number {
