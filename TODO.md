@@ -13,7 +13,7 @@ Quilla está en la versión preliminar `0.1.0`. Esta lista recoge el trabajo pre
 
 ## 2. Operaciones de paquetes y generaciones
 
-- [ ] Implementar `rollback` para activar una generación anterior y sincronizar el estado de la base de datos.
+- [x] Implementar `rollback` para activar una generación anterior y sincronizar el estado de la base de datos.
 - [ ] Implementar `remove`, incluyendo la resolución de dependencias que queden sin uso y el tratamiento de conflictos.
 - [ ] Implementar `update` para actualizar los índices y los paquetes instalados según las políticas de versiones definidas.
 - [ ] Definir y manejar de forma consistente paquetes reemplazados, dependencias opcionales y requisitos de versión incompatibles.
@@ -31,7 +31,7 @@ Quilla está en la versión preliminar `0.1.0`. Esta lista recoge el trabajo pre
 ## 4. Transacciones y recuperación (Working)
 
 - [x] Hacer que los cambios en el perfil y la base de datos se confirmen de forma coherente.
-- [ ] Recuperar o limpiar transacciones interrumpidas sin dejar el perfil y la base de datos en estados distintos.
+- [x] Recuperar o limpiar transacciones interrumpidas sin dejar el perfil y la base de datos en estados distintos.
 - [x] Definir el comportamiento ante fallos en cada etapa: descarga, verificación, extracción, escritura al store, creación de generación y activación.
 - [x] Asegurar que una generación incompleta nunca se active.
 

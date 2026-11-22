@@ -75,7 +75,7 @@ impl<'a> Transaction<'a> {
                         "Warning: the database could not be saved to the default path; a backup will be used, and the packages from the current generation will remain active.
                     ");
                     let backup_path = format!("{:?}.bak", db_path.as_ref());
-                    let _ = File::create(&backup_path).map_err(|e| Error::Io(e))?;
+                    let _ = File::create(&backup_path).map_err(Error::Io)?;
                     if let Err(backup_err) = db.save(&backup_path) {
                         eprintln!(
                             "The database backup could not be created in {}: {}",
@@ -239,18 +239,73 @@ impl<'a> Transaction<'a> {
     }
 }
 
+/// Rollback has been ruled out, as many of the operations within the transaction do not require by rollback.
+pub fn rollback<P: AsRef<Path>, R: io::Read + BufRead>(
+    generations: GenerationManager,
+    mut reader: R,
+    db: &mut Database,
+    db_path: P,
+) -> Result<()> {
+    let mut selected_generation = String::new();
+    if let Ok(list) = &generations.list_generations() {
+        println!(
+            "Generations list:{}",
+            list.iter()
+                .map(|generation| { format!("\n\t- {}", generation.number) })
+                .collect::<String>()
+        );
+    }
+    println!("Select previous generation: ");
+    reader
+        .read_line(&mut selected_generation)
+        .map_err(|e| Error::Io(e))?;
+
+    let Ok(selected_generation) = selected_generation.trim().parse::<u64>() else {
+        return Err(Error::Custom(
+            "Invalid number in selected generation".to_string(),
+        ));
+    };
+
+    reconcile_database_with_current(&generations, &generations.profile_dir(), db)?;
+    if let None = db.get_current_generation() {
+        return Err(TransactionError::Rollback(
+            "No current generation found in database".to_string(),
+        )
+        .into());
+    };
+
+    if selected_generation == 0 || !db.is_generation_exists(selected_generation) {
+        return Err(TransactionError::Rollback(
+            "There is no previous generation or generation number less than or equal to zero"
+                .to_string(),
+        )
+        .into());
+    }
+
+    generations.activate(selected_generation).map_err(|e| {
+        TransactionError::Rollback(format!(
+            "Failed while activating generation: {}",
+            e.to_string()
+        ))
+    })?;
+    db.set_current_generation(selected_generation)?;
+    db.save(&db_path)?;
+
+    println!("Activate previous generation, rollback to: {selected_generation}");
+    Ok(())
+}
+
 fn clean_interrupted_staging(generations_dir: &Path) -> Result<()> {
     if generations_dir.exists() {
         for entry in fs::read_dir(generations_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.is_dir() {
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.ends_with("staging") {
-                        println!("Cleaning interrupted staging directory: {:?}", path);
-                        fs::remove_dir_all(&path)?;
-                    }
-                }
+            if path.is_dir()
+                && let Some(name) = path.file_name().and_then(|n| n.to_str())
+                && name.ends_with("staging")
+            {
+                println!("Cleaning interrupted staging directory: {:?}", path);
+                fs::remove_dir_all(&path)?;
             }
         }
     }
@@ -269,13 +324,10 @@ fn reconcile_database_with_current(
             source: e,
         })
     })?;
-    let current_generation: Option<u64> = match generation.components().last() {
+    let current_generation: Option<u64> = match generation.components().next_back() {
         Some(component) => {
             if let Some(component_as_str) = component.as_os_str().to_str() {
-                match component_as_str.parse::<u64>() {
-                    Ok(n) => Some(n),
-                    Err(_) => None,
-                }
+                component_as_str.parse::<u64>().ok()
             } else {
                 None
             }
@@ -339,6 +391,7 @@ fn unpack_tar(packages: PackagesPaths, cache_dir: &Path) -> Result<PackagesPaths
 pub enum TransactionError {
     UnpackFail(String),
     ReconcileFail(String),
+    Rollback(String),
 }
 
 impl std::fmt::Display for TransactionError {
@@ -346,6 +399,7 @@ impl std::fmt::Display for TransactionError {
         match self {
             Self::UnpackFail(name) => write!(f, "Failed on unpack package: {name}"),
             Self::ReconcileFail(e) => write!(f, "Failed on reconcile current with database: {e}"),
+            Self::Rollback(e) => write!(f, "Rollback error: {e}"),
         }
     }
 }

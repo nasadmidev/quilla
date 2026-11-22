@@ -1,7 +1,8 @@
 use quilla::core::db::Database;
+use quilla::core::generations::GenerationManager;
 use quilla::core::package::{Arch, Constraint, Dependency};
 use quilla::core::repo::{Catalog, Repository};
-use quilla::core::transaction::Transaction;
+use quilla::core::transaction::{self, Transaction};
 use quilla::fetch::Fetcher;
 use quilla::utils::{config::Config, operations};
 use std::io::Cursor;
@@ -9,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod common;
-
+// Install Testing
 #[tokio::test]
 async fn installation_downloads_verifies_and_activates_a_generation() {
     let workspace = TestWorkspace::new();
@@ -72,6 +73,79 @@ async fn database_save_failure_apply_revert() {
 async fn database_save_failure_apply_active() {
     let input = "active\n";
     database_save_failure(input).await;
+}
+
+// Rollback Testing
+#[tokio::test]
+async fn should_run_rollback() {
+    let workspace = TestWorkspace::new();
+    let server_url = common::run_server(&workspace.0).await;
+    run_install(&workspace.0, &server_url, vec!["pkg_test"])
+        .await
+        .expect("First package installation failed");
+    assert_package_is_installed(&workspace.0);
+
+    run_install(&workspace.0, &server_url, vec!["pkg_test"])
+        .await
+        .expect("Second package installation failed");
+    let config = Config::load(&format!("{}/quilla.config.toml", workspace.0.display()))
+        .expect("Failed loading configuration");
+    let mut db = Database::load(&config.paths.database_path).expect("Failed loading database");
+    let generations =
+        GenerationManager::new(config.paths.profile_dir).expect("Failed loading generations");
+    let input = Cursor::new("1\n".as_bytes().to_owned());
+    let result = transaction::rollback(generations, input, &mut db, config.paths.database_path);
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn should_fail_on_rollback_invalid_number() {
+    let workspace = TestWorkspace::new();
+    let server_url = common::run_server(&workspace.0).await;
+    run_install(&workspace.0, &server_url, vec!["pkg_test"])
+        .await
+        .expect("First package installation failed");
+    assert_package_is_installed(&workspace.0);
+
+    run_install(&workspace.0, &server_url, vec!["pkg_test"])
+        .await
+        .expect("Second package installation failed");
+    let config = Config::load(&format!("{}/quilla.config.toml", workspace.0.display()))
+        .expect("Failed loading configuration");
+    let mut db = Database::load(&config.paths.database_path).expect("Failed loading database");
+    let generations =
+        GenerationManager::new(config.paths.profile_dir).expect("Failed loading generations");
+    let input = Cursor::new("s\n".as_bytes().to_owned());
+    let result = transaction::rollback(generations, input, &mut db, config.paths.database_path);
+    assert!(
+        result.is_err(),
+        "Expected rollback to failed on invalid number"
+    );
+}
+
+#[tokio::test]
+async fn should_fail_on_rollback_generation_not_exists() {
+    let workspace = TestWorkspace::new();
+    let server_url = common::run_server(&workspace.0).await;
+    run_install(&workspace.0, &server_url, vec!["pkg_test"])
+        .await
+        .expect("First package installation failed");
+    assert_package_is_installed(&workspace.0);
+
+    run_install(&workspace.0, &server_url, vec!["pkg_test"])
+        .await
+        .expect("Second package installation failed");
+    let config = Config::load(&format!("{}/quilla.config.toml", workspace.0.display()))
+        .expect("Failed loading configuration");
+    let mut db = Database::load(&config.paths.database_path).expect("Failed loading database");
+    let generations =
+        GenerationManager::new(config.paths.profile_dir).expect("Failed loading generations");
+    let input = Cursor::new("3\n".as_bytes().to_owned());
+    let result = transaction::rollback(generations, input, &mut db, config.paths.database_path);
+    assert!(
+        result.is_err(),
+        "Expected rollback to failed when generation does not exist"
+    );
 }
 
 async fn database_save_failure(input: &str) {
@@ -192,6 +266,16 @@ async fn repeated_installation_keeps_the_installed_state_consistent() {
 }
 
 async fn run_install(root: &Path, server_url: &str, packages: Vec<&str>) -> Result<(), String> {
+    let config = create_config(root, server_url)?;
+    let packages = packages.into_iter().map(str::to_string).collect();
+
+    tokio::task::spawn_blocking(move || operations::install(config, packages))
+        .await
+        .map_err(|error| format!("installation worker panicked: {error}"))?
+        .map_err(|error| error.to_string())
+}
+
+fn create_config(root: &Path, server_url: &str) -> Result<Config, String> {
     let config_path = root.join("quilla.config.toml");
     let config_content = format!(
         r#"
@@ -209,13 +293,7 @@ async fn run_install(root: &Path, server_url: &str, packages: Vec<&str>) -> Resu
         root = root.display(),
     );
     std::fs::write(&config_path, config_content).map_err(|error| error.to_string())?;
-    let config = Config::load(config_path).map_err(|error| error.to_string())?;
-    let packages = packages.into_iter().map(str::to_string).collect();
-
-    tokio::task::spawn_blocking(move || operations::install(config, packages))
-        .await
-        .map_err(|error| format!("installation worker panicked: {error}"))?
-        .map_err(|error| error.to_string())
+    Config::load(config_path).map_err(|error| error.to_string())
 }
 
 fn assert_package_is_installed(root: &Path) {

@@ -1,7 +1,8 @@
 use crate::core::db::Database;
+use crate::core::generations::GenerationManager;
 use crate::core::package::{Arch, Constraint, Dependency};
 use crate::core::repo::{Catalog, Repository};
-use crate::core::transaction::Transaction;
+use crate::core::transaction::{self, Transaction};
 use crate::fetch::Fetcher;
 use crate::utils::cli::{self, Command};
 use crate::utils::config::Config;
@@ -18,7 +19,9 @@ pub fn run(config_path: PathBuf) -> Result<()> {
         }
         Command::Remove(pkgs) => println!("Remove: {:?}", pkgs),
         Command::Upgrade => println!("Update system"),
-        Command::Rollback => println!("Return to previous generation"),
+        Command::Rollback => {
+            rollback(config)?;
+        }
     };
     Ok(())
 }
@@ -36,11 +39,72 @@ pub fn install(config: Config, pkgs: Vec<String>) -> Result<()> {
     };
 
     let fetcher = Fetcher::new(&config.paths.cache_dir)?;
-    let mut catalog = Catalog {
-        repositories: Vec::new(),
+    let mut catalog = Catalog::new();
+    create_catalog(&mut catalog, &fetcher, arch_name, &config)?;
+
+    let dependencies: Vec<Dependency> = pkgs
+        .into_iter()
+        .map(|pkg| Dependency {
+            name: pkg,
+            constraint: Constraint::Any,
+        })
+        .collect();
+    let mut db = match Database::load(&config.paths.database_path) {
+        Ok(f) => f,
+        Err(e) => {
+            if config.paths.database_path.exists() {
+                return Err(e);
+            } else {
+                Database::new()
+            }
+        }
     };
-    for config_repo in config.repositories {
-        let repository_name = config_repo.name;
+    let transaction = Transaction::new(
+        &catalog,
+        target_arch,
+        config.paths.cache_dir,
+        config.paths.store_dir,
+        config.paths.profile_dir,
+    )?;
+    transaction.install(
+        io::stdin().lock(),
+        &dependencies,
+        &[],
+        &mut db,
+        config.paths.database_path,
+    )?;
+    Ok(())
+}
+
+pub fn rollback(config: Config) -> Result<()> {
+    let generation_manager = GenerationManager::new(&config.paths.profile_dir)?;
+    let mut db = match Database::load(&config.paths.database_path) {
+        Ok(f) => f,
+        Err(e) => {
+            if config.paths.database_path.exists() {
+                return Err(e);
+            } else {
+                Database::new()
+            }
+        }
+    };
+    transaction::rollback(
+        generation_manager,
+        io::stdin().lock(),
+        &mut db,
+        config.paths.database_path,
+    )?;
+    Ok(())
+}
+
+fn create_catalog(
+    catalog: &mut Catalog,
+    fetcher: &Fetcher,
+    arch_name: &str,
+    config: &Config,
+) -> Result<()> {
+    for config_repo in config.repositories.iter() {
+        let repository_name = config_repo.name.clone();
         let mirrors: Vec<String> = config_repo
             .mirrors
             .iter()
@@ -82,40 +146,7 @@ pub fn install(config: Config, pkgs: Vec<String>) -> Result<()> {
                 last_index_error.unwrap_or_else(|| "no mirrors configured".to_string())
             )));
         }
-
         catalog.add_repository(repository)?;
     }
-
-    let dependencies: Vec<Dependency> = pkgs
-        .into_iter()
-        .map(|pkg| Dependency {
-            name: pkg,
-            constraint: Constraint::Any,
-        })
-        .collect();
-    let mut db = match Database::load(&config.paths.database_path) {
-        Ok(f) => f,
-        Err(e) => {
-            if config.paths.database_path.exists() {
-                return Err(e);
-            } else {
-                Database::new()
-            }
-        }
-    };
-    let transaction = Transaction::new(
-        &catalog,
-        target_arch,
-        config.paths.cache_dir,
-        config.paths.store_dir,
-        config.paths.profile_dir,
-    )?;
-    transaction.install(
-        io::stdin().lock(),
-        &dependencies,
-        &[],
-        &mut db,
-        config.paths.database_path,
-    )?;
     Ok(())
 }

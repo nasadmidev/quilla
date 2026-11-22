@@ -61,6 +61,14 @@ impl Database {
         }
     }
 
+    pub fn is_generation_exists(&self, number: u64) -> bool {
+        if let Some(_) = self.generations.get(&number) {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let path = path.as_ref();
         let temp_path = path.with_extension(format!("{}.tmp", std::process::id()));

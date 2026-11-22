@@ -240,6 +240,12 @@ pub struct Catalog {
 }
 
 impl Catalog {
+    pub fn new() -> Self {
+        Self {
+            repositories: Vec::new(),
+        }
+    }
+
     pub fn find_satisfying<'a>(
         &'a self,
         dependency: &Dependency,
